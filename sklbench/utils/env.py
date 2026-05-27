@@ -15,6 +15,7 @@
 # ===============================================================================
 
 import json
+import os
 import subprocess
 import sys
 from typing import Dict
@@ -77,6 +78,35 @@ def get_number_of_sockets():
 
 def get_software_info() -> Dict:
     result = dict()
+    # pixi list
+    pixi_project_root = os.environ.get("PIXI_PROJECT_ROOT")
+    pixi_environment_name = os.environ.get("PIXI_ENVIRONMENT_NAME")
+    if pixi_project_root and pixi_environment_name:
+        try:
+            pixi_list = subprocess.check_output(
+                [
+                    "pixi",
+                    "list",
+                    "--manifest-path",
+                    pixi_project_root,
+                    "--environment",
+                    pixi_environment_name,
+                    "--json",
+                ],
+                shell=False,
+                text=True,
+            )
+            pixi_packages = json.loads(pixi_list)
+            result["pixi_packages"] = {pkg.pop("name"): pkg for pkg in pixi_packages}
+            return result
+        except (
+            FileNotFoundError,
+            PermissionError,
+            subprocess.CalledProcessError,
+            json.JSONDecodeError,
+        ):
+            logger.warning("Unable to get python packages list via pixi")
+
     # conda list
     try:
         _, conda_list, _ = read_output_from_command("conda list --json")
