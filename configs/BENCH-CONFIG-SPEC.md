@@ -9,6 +9,11 @@ Benchmark config files are written in JSON format and have a few reserved keys:
  - `SETS` - List parameters sets to include in the template
 
 Configs heavily utilize lists of scalar values and dictionaries to avoid duplication of cases.
+Keys ending with `+` define variants of a sibling dictionary key. For example,
+`"estimator_params+"` requires `"estimator_params"` in the same object and expands
+to a list where each variant is merged with the base `"estimator_params"` value.
+The `+` key value must be a dictionary or a list of dictionaries. This also works
+for parameter set names, for example `"my set+"` variants merge with `"my set"`.
 
 Formatting specification:
 ```json

@@ -86,6 +86,62 @@ def merge_dicts(first: Dict, second: Dict) -> Dict:
     return result
 
 
+def expand_variant_keys(config_part):
+    if isinstance(config_part, list):
+        for i, value in enumerate(config_part):
+            config_part[i] = expand_variant_keys(value)
+        return config_part
+    elif not isinstance(config_part, dict):
+        return config_part
+
+    for key, value in list(config_part.items()):
+        config_part[key] = expand_variant_keys(value)
+
+    for key in list(config_part.keys()):
+        if not key.endswith("+"):
+            continue
+
+        base_key = key[:-1]
+        if base_key == "":
+            raise ValueError('Variant key "+" is not supported')
+        if base_key not in config_part:
+            raise ValueError(
+                f'Variant key "{key}" requires base key "{base_key}" '
+                "in the same config object"
+            )
+
+        variants = config_part[key]
+        if isinstance(variants, dict):
+            variants = [variants]
+        elif not (
+            isinstance(variants, list)
+            and all(isinstance(variant, dict) for variant in variants)
+        ):
+            raise ValueError(f'Variant key "{key}" must contain a dict or list of dicts')
+
+        base = config_part[base_key]
+        if isinstance(base, dict):
+            base_variants = [base]
+        elif isinstance(base, list) and all(
+            isinstance(base_variant, dict) for base_variant in base
+        ):
+            base_variants = base
+        else:
+            raise ValueError(
+                f'Base key "{base_key}" for variant key "{key}" must contain '
+                "a dict or list of dicts"
+            )
+
+        config_part[base_key] = [
+            merge_dicts(base_variant, variant)
+            for base_variant in base_variants
+            for variant in variants
+        ]
+        del config_part[key]
+
+    return config_part
+
+
 def parse_config_file(config_path: str) -> List[Dict]:
     with open(config_path, "r") as config_file:
         config_content = json.load(config_file)
@@ -106,6 +162,10 @@ def parse_config_file(config_path: str) -> List[Dict]:
             config_content["PARAMETERS_SETS"].update(include_content)
         else:
             config_content["PARAMETERS_SETS"] = include_content
+    if "PARAMETERS_SETS" in config_content:
+        expand_variant_keys(config_content["PARAMETERS_SETS"])
+    for template_content in config_content["TEMPLATES"].values():
+        expand_variant_keys(template_content)
     for template_name, template_content in config_content["TEMPLATES"].items():
         new_templates = [{}]
         # 1st step: pop list of included param sets and add them to template
