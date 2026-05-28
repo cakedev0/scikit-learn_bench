@@ -382,10 +382,10 @@ def generate_bench_cases(args: argparse.Namespace) -> List[BenchCase]:
     logger.debug(
         f"Number of loaded cases before removal of duplicates: {len(all_bench_cases)}"
     )
-    all_bench_cases = remove_duplicated_bench_cases(all_bench_cases)
 
     # assign special values in bench_cases
     all_bench_cases = list(map(assign_case_special_values_on_generation, all_bench_cases))
+    all_bench_cases = remove_duplicated_bench_cases(all_bench_cases)
 
     logger.info(f"Number of loaded cases: {len(all_bench_cases)}")
     logger.debug(f"Loaded cases:\n{custom_format(all_bench_cases)}")
