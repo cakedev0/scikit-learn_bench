@@ -182,6 +182,12 @@ def assign_case_special_values_on_run(
         # faiss GPU algorithm selection
         elif library == "sklbench.emulators.faiss" and estimator == "NearestNeighbors":
             set_bench_case_value(bench_case, "algorithm:estimator_params:device", device)
+        elif library == "sklearn" and get_bench_case_value(
+            bench_case, "algorithm:sklearn_context:array_api_dispatch", False
+        ):
+            logger.debug(
+                f'Using device specification "{device}" for array API input arrays'
+            )
         else:
             logger.warning(f'Device specification "{device}" is not used for this case')
     # assign "default" or changed device for output

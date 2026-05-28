@@ -26,6 +26,25 @@ from ..utils.bench_case import get_bench_case_value
 from ..utils.logger import logger
 
 
+def _torch_dtype(dtype: str | None):
+    if dtype is None:
+        return None
+
+    import torch
+
+    dtype_aliases = {
+        "float": "float32",
+        "double": "float64",
+        "int": "int64",
+        "long": "int64",
+    }
+    dtype_name = dtype_aliases.get(dtype, dtype)
+    torch_dtype = getattr(torch, dtype_name, None)
+    if torch_dtype is None:
+        raise ValueError(f"Unknown torch dtype {dtype}")
+    return torch_dtype
+
+
 def convert_data(data, dformat: str, order: str, dtype: str, device: str = None):
     if isinstance(data, csr_matrix) and dformat != "csr_matrix":
         data = data.toarray()
@@ -47,6 +66,14 @@ def convert_data(data, dformat: str, order: str, dtype: str, device: str = None)
         import dpnp
 
         return dpnp.array(data, dtype=dtype, order=order, device=device)
+    elif dformat == "torch":
+        import torch
+
+        kwargs = {"device": device} if device is not None else {}
+        torch_dtype = _torch_dtype(dtype)
+        if torch_dtype is not None:
+            kwargs["dtype"] = torch_dtype
+        return torch.asarray(data, **kwargs)
     elif dformat == "dpctl":
         warnings.warn(
             "dpctl tensors are deprecated and support for them "

@@ -224,6 +224,8 @@ def convert_to_numpy(a, dp_compat=False) -> np.ndarray:
         import dpctl.tensor
 
         return dpctl.tensor.to_numpy(a)
+    elif "torch.Tensor" in str(type(a)):
+        return a.detach().cpu().numpy()
     elif "cupy.ndarray" in str(type(a)):
         return a.get()
     else:
