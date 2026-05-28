@@ -99,6 +99,15 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         "For example: `-p data:dtype=float32 data:order=F`.",
     )
     parser.add_argument(
+        "--templates",
+        "--template",
+        "-t",
+        default=None,
+        type=str,
+        nargs="+",
+        help="Filters config templates by name before benchmark cases are generated.",
+    )
+    parser.add_argument(
         "--parameter-filters",
         "--filters",
         "-f",

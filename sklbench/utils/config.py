@@ -142,7 +142,9 @@ def expand_variant_keys(config_part):
     return config_part
 
 
-def parse_config_file(config_path: str) -> List[Dict]:
+def parse_config_file(
+    config_path: str, template_names: Union[List[str], None] = None
+) -> List[Dict]:
     with open(config_path, "r") as config_file:
         config_content = json.load(config_file)
     templates = list()
@@ -167,6 +169,8 @@ def parse_config_file(config_path: str) -> List[Dict]:
     for template_content in config_content["TEMPLATES"].values():
         expand_variant_keys(template_content)
     for template_name, template_content in config_content["TEMPLATES"].items():
+        if template_names is not None and template_name not in template_names:
+            continue
         new_templates = [{}]
         # 1st step: pop list of included param sets and add them to template
         if "SETS" in template_content:
@@ -345,7 +349,9 @@ def generate_bench_cases(args: argparse.Namespace) -> List[BenchCase]:
     # (without expanded paramaters from lists and ranges)
     bench_case_templates = list()
     for config_file in config_files:
-        bench_case_templates += parse_config_file(config_file)
+        bench_case_templates += parse_config_file(config_file, args.templates)
+    if len(bench_case_templates) == 0 and args.templates is not None:
+        raise ValueError(f"Unable to find requested templates: {args.templates}")
 
     # overwrite templates by globally defined parameters or use them as template
     global_parameters = parse_cli_parameters(args.parameters)
