@@ -113,7 +113,7 @@ def run_benchmark_from_case(
     if stdout != "":
         logger.debug(f'{custom_format("Benchmark stdout:", bcolor="OKBLUE")}\n{stdout}')
     if return_code == 0:
-        if stderr != "":
+        if stderr.strip() != "":
             logger.warning(f"Benchmark stderr:\n{stderr}")
         try:
             result = json.loads(stdout)
