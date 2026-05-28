@@ -60,7 +60,7 @@ def get_estimator(library_name: str, estimator_name: str):
             f'List of estimator with name "{estimator_name}": '
             f"{classes_map[estimator_name]}"
         )
-        logger.warning(
+        logger.debug(
             f"Found {len(classes_map[estimator_name])} classes for "
             f'"{estimator_name}" estimator name. '
             f"Using first {classes_map[estimator_name][0]}."
