@@ -19,6 +19,7 @@ import io
 import json
 import logging
 import os
+from copy import deepcopy
 from importlib.metadata import PackageNotFoundError, version
 from typing import Dict, List, Union
 
@@ -46,7 +47,7 @@ from ..utils.custom_types import BenchCase, Numeric, NumpyNumeric
 from ..utils.logger import logger
 from ..utils.measurement import measure_case
 from ..utils.special_params import assign_case_special_values_on_run
-from .common import enrich_result, main_template
+from .common import main_template
 
 
 def get_estimator(library_name: str, estimator_name: str):
@@ -559,20 +560,14 @@ def main(bench_case: BenchCase, filters: List[BenchCase]):
             y_test,
         )
 
-    result_template = {
-        "task": task,
-        "estimator": estimator_name,
-    }
-    result_template = enrich_result(result_template, bench_case)
-    if "assume_finite" in context_params:
-        result_template["assume_finite"] = context_params["assume_finite"]
+    case = deepcopy(bench_case)
+    case.setdefault("algorithm", {})["task"] = task
     if hasattr(estimator_instance, "get_params"):
         estimator_params = estimator_instance.get_params()
     # note: "handle" is not JSON-serializable
     if "handle" in estimator_params:
         del estimator_params["handle"]
     logger.debug(f"Estimator parameters:\n{custom_format(estimator_params)}")
-    result_template.update(estimator_params)
 
     data_descs = {
         "training": data_description["x_train"],
@@ -589,17 +584,15 @@ def main(bench_case: BenchCase, filters: List[BenchCase]):
         if "n_classes" in data_description:
             data_descs[stage].update({"n_classes": data_description["n_classes"]})
 
-    results = list()
+    case.setdefault("data", {}).update(data_descs)
+
+    results = dict()
     for method in metrics.keys():
-        result = result_template.copy()
         for stage in estimator_methods.keys():
             if method in estimator_methods[stage]:
-                result.update({"stage": stage, "method": method})
-                result.update(data_descs[stage])
-                result.update(metrics[method])
-        results.append(result)
+                results[method] = metrics[method]
 
-    return results
+    return [{"case": case, "results": results}]
 
 
 if __name__ == "__main__":

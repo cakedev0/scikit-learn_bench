@@ -14,6 +14,7 @@
 # limitations under the License.
 # ===============================================================================
 
+from copy import deepcopy
 from typing import Dict, List, Tuple
 
 from ..datasets import load_data
@@ -25,7 +26,7 @@ from ..utils.custom_types import BenchCase
 from ..utils.logger import logger
 from ..utils.measurement import measure_case
 from ..utils.special_params import assign_case_special_values_on_run
-from .common import enrich_result, main_template
+from .common import main_template
 
 
 def get_function_instance(library_name: str, function_name: str):
@@ -92,15 +93,13 @@ def main(bench_case: BenchCase, filters: List[BenchCase]):
         **get_bench_case_value(bench_case, "algorithm:kwargs", dict()),
     )
 
-    result = {
-        "task": "utility",
-        "function": function_name,
-    }
-    result = enrich_result(result, bench_case)
+    case = deepcopy(bench_case)
+    case.setdefault("algorithm", {})["task"] = "utility"
     # TODO: replace `x_train` data_desc with more informative values
-    result.update(data_description["x_train"])
-    result.update(metrics)
-    return [result]
+    case.setdefault("data", {}).update(data_description["x_train"])
+    if "n_classes" in data_description:
+        case["data"]["n_classes"] = data_description["n_classes"]
+    return [{"case": case, "results": {function_name: metrics}}]
 
 
 if __name__ == "__main__":

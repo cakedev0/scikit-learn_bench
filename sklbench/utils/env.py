@@ -82,6 +82,8 @@ def get_software_info() -> Dict:
     pixi_project_root = os.environ.get("PIXI_PROJECT_ROOT")
     pixi_environment_name = os.environ.get("PIXI_ENVIRONMENT_NAME")
     if pixi_project_root and pixi_environment_name:
+        result["pixi_project_root"] = pixi_project_root
+        result["pixi_environment_name"] = pixi_environment_name
         try:
             pixi_list = subprocess.check_output(
                 [
@@ -135,7 +137,7 @@ def get_oneapi_devices() -> pd.DataFrame:
                 "vendor": device.vendor,
                 "type": str(device.device_type).split(".")[1],
                 "driver version": device.driver_version,
-                "memory size[GB]": device.global_mem_size / 2**30,
+                "memory size[GB]": round(device.global_mem_size / 2**30),
             }
             for device in devices
         }
@@ -199,8 +201,8 @@ def get_hardware_info() -> Dict:
     try:
         import psutil
 
-        result["RAM size[GB]"] = psutil.virtual_memory().total / 2**30
-        logger.info(f'RAM size[GB]: {round(result["RAM size[GB]"], 3)}')
+        result["RAM size[GB]"] = round(psutil.virtual_memory().total / 2**30)
+        logger.info(f'RAM size[GB]: {result["RAM size[GB]"]}')
     except (ImportError, ModuleNotFoundError):
         logger.warning('Unable to parse memory info with "psutil" module')
     return result

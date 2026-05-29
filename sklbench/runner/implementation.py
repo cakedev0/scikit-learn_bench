@@ -63,7 +63,7 @@ def call_benchmarks(
                 if early_exit:
                     break
             for entry in bench_entries:
-                entry["environment_name"] = environment_name
+                entry["results"]["environment_name"] = environment_name
                 results.append(entry)
         except KeyboardInterrupt:
             return_code = -1

@@ -26,6 +26,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 from scipy.stats import gmean
 
+from ..utils.bench_case import get_data_name
 from ..utils.common import custom_format, flatten_list
 from ..utils.logger import logger
 from ..utils.measurement import enrich_metrics
@@ -123,6 +124,68 @@ COLUMN_COLOR_RULES = {
 }
 
 DIFFBY_COLUMNS = ["environment_name", "library", "format", "device"]
+
+
+def get_stage_by_method(case: Dict, method: str):
+    estimator_methods = {
+        "training": ["fit"],
+        "inference": ["predict", "predict_proba", "transform"],
+    }
+    estimator_methods.update(case.get("algorithm", {}).get("estimator_methods", {}))
+    for stage, methods in estimator_methods.items():
+        if isinstance(methods, str):
+            methods = methods.split("|")
+        if method in methods:
+            return stage
+    return None
+
+
+def flatten_nested_bench_result(bench_result: Dict) -> List[Dict]:
+    """Flatten the raw nested JSON result into the table-oriented shape."""
+    case = bench_result["case"]
+    algorithm_desc = case.get("algorithm", {})
+    data_desc = case.get("data", {})
+    estimator_params = algorithm_desc.get("estimator_params", {})
+    environment_name = bench_result["results"].get("environment_name")
+
+    common_result = {
+        "task": algorithm_desc.get("task"),
+        "library": algorithm_desc.get("library"),
+        "estimator": algorithm_desc.get("estimator"),
+        "function": algorithm_desc.get("function"),
+        "device": algorithm_desc.get("device"),
+        "dataset": get_data_name(case, shortened=True),
+        "environment_name": environment_name,
+    }
+    common_result.update(estimator_params)
+
+    flat_results = []
+    for result_name, result in bench_result["results"].items():
+        if result_name == "environment_name":
+            continue
+        flat_result = common_result.copy()
+        if algorithm_desc.get("estimator") is not None:
+            stage = get_stage_by_method(case, result_name)
+            flat_result["stage"] = stage
+            flat_result["method"] = result_name
+            method_data_desc = data_desc.get(stage, {})
+        else:
+            method_data_desc = data_desc
+        for key in [
+            "samples",
+            "features",
+            "format",
+            "dtype",
+            "order",
+            "n_classes",
+            "n_clusters",
+            "batch_size",
+        ]:
+            if key in method_data_desc:
+                flat_result[key] = method_data_desc[key]
+        flat_result.update(result)
+        flat_results.append(flat_result)
+    return flat_results
 
 
 def geomean_wrapper(a):
@@ -269,10 +332,15 @@ def get_result_tables_as_df(
     include_performance_stability_metrics=False,
 ):
     bench_cases = pd.DataFrame(
-        [
-            enrich_metrics(bench_case, include_performance_stability_metrics)
-            for bench_case in results["bench_cases"]
-        ]
+        flatten_list(
+            [
+                [
+                    enrich_metrics(flat_bench_case, include_performance_stability_metrics)
+                    for flat_bench_case in flatten_nested_bench_result(bench_case)
+                ]
+                for bench_case in results["bench_cases"]
+            ]
+        )
     )
 
     if compatibility_mode:
