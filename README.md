@@ -82,6 +82,7 @@ flowchart TB
 - [Configs](configs/README.md)
   - [Benchmarking Config Specification](configs/BENCH-CONFIG-SPEC.md)
 - [Benchmarks Runner](sklbench/runner/README.md)
+- [Reports](sklbench/reports/README.md)
 - [Benchmarks](sklbench/benchmarks/README.md)
 - [Data Processing and Storage](sklbench/datasets/README.md)
 - [Emulators](sklbench/emulators/README.md)
