@@ -19,9 +19,10 @@ import io
 import json
 import logging
 import os
+import re
 from copy import deepcopy
 from importlib.metadata import PackageNotFoundError, version
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -302,9 +303,17 @@ def get_context(bench_case: BenchCase):
 
 def sklearnex_logger_is_available() -> bool:
     try:
-        sklex_version = tuple(map(int, version("scikit-learn-intelex").split(".")))
-        # scikit-learn-intelex packages is still signed with build date
-        return sklex_version > (20230510, 0)
+        sklex_version = tuple(
+            int(version_part)
+            for version_part in re.findall(r"\d+", version("scikit-learn-intelex"))
+        )
+        if not sklex_version:
+            return False
+        # Old scikit-learn-intelex packages were signed with build dates, while
+        # recent packages use year-based versions such as 2025.x or 2199.x.
+        if sklex_version[0] >= 10_000_000:
+            return sklex_version > (20230510, 0)
+        return sklex_version >= (2023, 2)
     except PackageNotFoundError:
         return False
 
@@ -322,17 +331,48 @@ def get_sklearnex_logging_stream() -> io.StringIO:
     return stream
 
 
-def verify_patching(stream: io.StringIO, function_name) -> bool:
-    acceleration_lines = 0
-    fallback_lines = 0
+def sklearnex_context_disallows_fallback(bench_case: BenchCase) -> bool:
+    sklearnex_context = get_bench_case_value(
+        bench_case, "algorithm:sklearnex_context", dict()
+    )
+    if not isinstance(sklearnex_context, dict):
+        return False
+    return (
+        sklearnex_context.get("allow_fallback_to_host") is False
+        or sklearnex_context.get("allow_sklearn_after_onedal") is False
+    )
+
+
+def verify_patching(
+    stream: io.StringIO, function_name: str, target_device: Optional[str] = None
+) -> Tuple[bool, str]:
+    acceleration_lines = []
+    fallback_lines = []
     logs = stream.getvalue().split("\n")[:-1]
     for line in logs:
         if function_name in line:
             if "running accelerated version on" in line:
-                acceleration_lines += 1
+                acceleration_lines.append(line)
             if "fallback to original Scikit-learn" in line:
-                fallback_lines += 1
-    return acceleration_lines > 0 and fallback_lines == 0
+                fallback_lines.append(line)
+
+    if fallback_lines:
+        return False, f"{function_name} fell back in sklearnex:\n" + "\n".join(
+            fallback_lines
+        )
+    if not acceleration_lines:
+        return False, f"{function_name} was not patched by sklearnex."
+
+    if target_device is not None and target_device != "default":
+        expected_device = target_device.upper()
+        if not any(f" on {expected_device}" in line for line in acceleration_lines):
+            return (
+                False,
+                f"{function_name} did not run on requested {target_device} device:\n"
+                + "\n".join(acceleration_lines),
+            )
+
+    return True, ""
 
 
 def validate_estimator_params(estimator_class, estimator_params: Dict) -> Dict:
@@ -431,6 +471,7 @@ def measure_sklearn_estimator(
     ensure_sklearnex_patching = get_bench_case_value(
         bench_case, "bench:ensure_sklearnex_patching", True
     )
+    fail_on_sklearnex_fallback = sklearnex_context_disallows_fallback(bench_case)
     ensure_sklearnex_patching = (
         ensure_sklearnex_patching
         and sklearnex_logger_is_available()
@@ -486,13 +527,15 @@ def measure_sklearn_estimator(
                 if ensure_sklearnex_patching:
                     full_method_name = f"{estimator_class.__name__}.{method}"
                     sklearnex_logging_stream.seek(0)
-                    method_is_patched = verify_patching(
-                        sklearnex_logging_stream, full_method_name
+                    method_is_patched, patching_message = verify_patching(
+                        sklearnex_logging_stream,
+                        full_method_name,
+                        get_bench_case_value(bench_case, "algorithm:device"),
                     )
                     if not method_is_patched:
-                        logger.warning(
-                            f"{full_method_name} was not patched by sklearnex."
-                        )
+                        if fail_on_sklearnex_fallback:
+                            raise RuntimeError(patching_message)
+                        logger.warning(patching_message)
 
     quality_metrics = {
         "training": get_subset_metrics_of_estimator(
