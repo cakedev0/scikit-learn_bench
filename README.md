@@ -48,11 +48,12 @@ How to run benchmarks using the `sklbench` module and a specific configuration:
 python -m sklbench --config configs/sklearn_example.json
 ```
 
-The default output is a file with JSON-formatted results of benchmarking cases at
-`result.json`. To specify a custom output path, run:
+The default output is an append-only `results/` directory containing
+content-addressed environment files and timestamped benchmark result files. To
+specify a custom output directory, run:
 
 ```bash
-python -m sklbench --config configs/sklearn_example.json --result-file result_example.json
+python -m sklbench --config configs/sklearn_example.json --results-dir results_example
 ```
 
 For a description of all benchmarks runner arguments, refer to [documentation](sklbench/runner/README.md#arguments).

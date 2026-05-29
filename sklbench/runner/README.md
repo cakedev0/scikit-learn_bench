@@ -14,7 +14,7 @@ And follows the next steps:
 2. Filter them if possible to compare parameters and filters (early filtering)
 3. Prefetch datasets in parallel if explicitly requested with a special argument
 4. Sequentially call individual benchmarks as subprocesses
-5. Combine raw results and output them as a JSON file
+5. Write environment metadata and raw benchmark results to append-only JSON files
 
 See [benchmarking config specification](../../docs/README.md) for explanation of config files formatting.
 
@@ -43,10 +43,23 @@ flowchart LR
 | `--parameters`</br>`--params`</br>`-p`         | str    |                                                     |                                                | Globally defines or overwrites config parameters. For example: `-p data:dtype=float32 data:order=F`.                             |
 | `--templates`</br>`--template`</br>`-t`        | str    |                                                     |                                                | Filters config templates by name before benchmark cases are generated.                                                           |
 | `--parameter-filters`</br>`--filters`</br>`-f` | str    |                                                     |                                                | Filters benchmarking cases by parameter values. For example: `-f data:dtype=float32 data:order=F`.                               |
-| `--result-file`</br>`-r`                       | str    | result.json                                         |                                                | File path to store scikit-learn_bench's runned cases results.                                                                    |
-| `--environment-name`</br>`--env-name`</br>`-e` | str    |                                                     |                                                | Environment name to use instead of it's configuration hash.                                                                      |
+| `--results-dir`                                | str    | results                                             |                                                | Directory path to store scikit-learn_bench results.                                                                              |
 | `--prefetch-datasets`                          |        | False                                               |                                                | Load all requested datasets in parallel before running benchmarks.                                                               |
 | `--exit-on-error`                              |        | False                                               |                                                | Interrupt runner and exit if last benchmark failed with error.                                                                   |
 | `--describe-parser`                            |        | False                                               |                                                | Print parser description in Markdown table format and exit.                                                                      |
+
+Results are written under `results/` by default:
+
+```text
+results/
+  envs/
+    <env_name>.json
+  <env_name>/
+    results_<YYYYMMDDTHHMMSSffffffZ>.json
+```
+
+The environment name is the SHA-256 hash of the environment metadata. Environment
+files contain the raw environment metadata. Timestamped results files contain
+`{"bench_cases": [...]}`.
 ---
 [Documentation tree](../../README.md#-documentation)

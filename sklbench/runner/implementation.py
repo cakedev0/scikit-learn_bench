@@ -16,9 +16,12 @@
 
 
 import argparse
+import hashlib
 import json
+from datetime import datetime, timezone
 from multiprocessing import Pool
-from typing import Dict, List, Tuple, Union
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 from psutil import cpu_count
 from tqdm import tqdm
@@ -37,13 +40,9 @@ def call_benchmarks(
     bench_cases: List[BenchCase],
     filters: List[BenchCase],
     log_level: str = "WARNING",
-    environment_name: Union[str, None] = None,
     early_exit: bool = False,
-) -> Tuple[int, Dict[str, Union[Dict, List]]]:
+) -> Tuple[int, List[Dict]]:
     """Iterates over benchmarking cases with progress bar and combines their results"""
-    env_info = get_environment_info()
-    if environment_name is None:
-        environment_name = hash_from_json_repr(env_info)
     results = list()
     return_code = 0
     bench_cases_with_pbar = tqdm(bench_cases)
@@ -61,17 +60,33 @@ def call_benchmarks(
                 return_code = bench_return_code
                 if early_exit:
                     break
-            for entry in bench_entries:
-                entry["results"]["environment_name"] = environment_name
-                results.append(entry)
+            results.extend(bench_entries)
         except KeyboardInterrupt:
             return_code = -1
             break
-    full_result = {
-        "bench_cases": results,
-        "environment": {environment_name: env_info},
-    }
-    return return_code, full_result
+    return return_code, results
+
+
+def save_results(bench_cases: List[Dict], env_name: str, env_info: Dict, results_dir: str):
+    results_root = Path(results_dir)
+    env_dir = results_root / "envs"
+    bench_results_dir = results_root / env_name
+    env_dir.mkdir(parents=True, exist_ok=True)
+    bench_results_dir.mkdir(parents=True, exist_ok=True)
+
+    env_file = env_dir / f"{env_name}.json"
+    try:
+        with open(env_file, "x") as fp:
+            json.dump(env_info, fp, indent=4)
+    except FileExistsError:
+        pass
+
+    result = {"bench_cases": bench_cases}
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    result_file = bench_results_dir / f"results_{timestamp}.json"
+    with open(result_file, "x") as fp:
+        json.dump(result, fp, indent=4)
+    logger.warning(f"Benchmark results saved to {result_file}")
 
 
 def run_benchmarks(args: argparse.Namespace) -> int:
@@ -81,6 +96,9 @@ def run_benchmarks(args: argparse.Namespace) -> int:
             setattr(args, f"{log_type}_log_level", args.log_level)
     # set logging level
     logger.setLevel(args.runner_log_level)
+
+    env_info = get_environment_info()
+    env_name = hash_from_json_repr(env_info, hash_limit=6)
 
     # find and parse configs
     bench_cases = generate_bench_cases(args)
@@ -109,15 +127,13 @@ def run_benchmarks(args: argparse.Namespace) -> int:
         bench_cases,
         param_filters,
         args.bench_log_level,
-        args.environment_name,
         args.exit_on_error,
     )
 
     # output raw result
     logger.debug(custom_format(result))
 
-    # save result to file
-    with open(args.result_file, "w") as fp:
-        json.dump(result, fp, indent=4)
+    # save results to append-only results directory
+    save_results(result, env_name, env_info, args.results_dir)
 
     return return_code

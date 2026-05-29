@@ -117,19 +117,10 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
     )
 
     parser.add_argument(
-        "--result-file",
-        "-r",
+        "--results-dir",
         type=str,
-        default="result.json",
-        help="File path to store scikit-learn_bench's runned cases results.",
-    )
-    parser.add_argument(
-        "--environment-name",
-        "--env-name",
-        "-e",
-        type=str,
-        default=None,
-        help="Environment name to use instead of it's configuration hash.",
+        default="results",
+        help="Directory path to store scikit-learn_bench results.",
     )
     parser.add_argument(
         "--prefetch-datasets",
