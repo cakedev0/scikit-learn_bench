@@ -14,8 +14,6 @@ stateDiagram-v2
 
     user_arguments:::inputOutput --> ArgumentParser
     BenchmarksRunner --> raw_results[JSON]:::inputOutput
-    raw_results[JSON] --> ReportGenerator
-    ReportGenerator --> benchmarks_report[Excel]:::inputOutput
 
     state BenchmarksRunner {
         ArgumentParser --> ConfigParser: config_arguments
@@ -37,9 +35,8 @@ Scikit-learn_bench consists of three main parts:
      2. Transforms arguments to benchmark cases as parameters for individual benchmarks (config parser).
      3. Combines the raw outputs.
  - **Individual benchmarks** wrapping specific entities or workloads (sklearn-like estimators, custom functions, etc.)
- - **Report generator** which consumes benchmarks' outputs and generates high-level report with aggregated stats
 
-Runner is responsible for orchestration of benchmarking cases, individual benchmarks - for actual run of each case, report generator - for human-readable output.
+Runner is responsible for orchestration of benchmarking cases, individual benchmarks - for actual run of each case.
 
 ## Configs parser workflow
 

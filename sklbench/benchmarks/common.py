@@ -44,7 +44,7 @@ def enrich_result(result: Dict, bench_case: BenchCase) -> Dict:
     )
     if enable_modelbuilders and result["library"] in ["xgboost", "lightgbm", "catboost"]:
         # NOTE: while modelbuilders are stored in `daal4py.mb` namespace
-        # their results are saved as `sklearnex` for better report readability
+        # their results are saved as `sklearnex` for consistency with sklearnex runs.
         logger.debug(
             "Modelbuilders are enabled, changing library "
             f"`{result['library']}` to `sklearnex` in benchmark output."

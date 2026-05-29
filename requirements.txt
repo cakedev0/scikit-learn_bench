@@ -7,7 +7,6 @@ tabulate
 fastparquet
 h5py
 openml
-openpyxl
 tqdm
 psutil
 requests

@@ -24,7 +24,6 @@ from psutil import cpu_count
 from tqdm import tqdm
 
 from ..datasets import load_data_with_cleanup
-from ..report import generate_report, get_result_tables_as_df
 from ..utils.bench_case import get_bench_case_name, get_data_name
 from ..utils.common import custom_format, hash_from_json_repr
 from ..utils.config import early_filtering, generate_bench_cases, generate_bench_filters
@@ -78,7 +77,7 @@ def call_benchmarks(
 def run_benchmarks(args: argparse.Namespace) -> int:
     # overwrite all logging levels if requested
     if args.log_level is not None:
-        for log_type in ["runner", "bench", "report"]:
+        for log_type in ["runner", "bench"]:
             setattr(args, f"{log_type}_log_level", args.log_level)
     # set logging level
     logger.setLevel(args.runner_log_level)
@@ -120,16 +119,5 @@ def run_benchmarks(args: argparse.Namespace) -> int:
     # save result to file
     with open(args.result_file, "w") as fp:
         json.dump(result, fp, indent=4)
-
-    # output as pandas dataframe
-    if len(result["bench_cases"]) != 0:
-        for key, df in get_result_tables_as_df(result).items():
-            logger.info(f'{custom_format(key, bcolor="HEADER")}\n{df}')
-
-    # generate report
-    if args.report:
-        if args.result_file not in args.result_files:
-            args.result_files.append(args.result_file)
-        generate_report(args)
 
     return return_code

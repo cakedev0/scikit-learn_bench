@@ -19,8 +19,6 @@ from typing import Dict, List
 
 import pandas as pd
 
-from ..report import add_report_generator_arguments
-
 
 def get_parser_description(parser: argparse.ArgumentParser) -> pd.DataFrame:
     """Convert parser description to Markdown-style table."""
@@ -75,7 +73,7 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         type=str,
         choices=("ERROR", "WARNING", "INFO", "DEBUG"),
         help="Global logging level for benchmarks: "
-        "overwrites runner, benchmarks and report logging levels.",
+        "overwrites runner and benchmarks logging levels.",
     )
     # benchmarking cases finding, overwriting and filtering
     parser.add_argument(
@@ -153,14 +151,6 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         action="store_true",
         help="Print parser description in Markdown table format and exit.",
     )
-    # report generator arguments for optional usage
-    parser.add_argument(
-        "--report",
-        default=False,
-        action="store_true",
-        help="Enables generation of report.",
-    )
-    add_report_generator_arguments(parser)
     return parser
 
 
