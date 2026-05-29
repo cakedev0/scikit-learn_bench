@@ -16,7 +16,6 @@
 
 
 import argparse
-import hashlib
 import json
 from datetime import datetime, timezone
 from multiprocessing import Pool
