@@ -151,6 +151,100 @@ def get_oneapi_devices() -> pd.DataFrame:
     return pd.DataFrame({"type": list()})
 
 
+def decode_nvml_value(value):
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return value
+
+
+def get_nvml_value(getter, *args):
+    try:
+        return decode_nvml_value(getter(*args))
+    except Exception:
+        return None
+
+
+def format_cuda_driver_version(version):
+    if version is None:
+        return None
+    return f"{version // 1000}.{version % 1000 // 10}"
+
+
+def get_nvidia_devices() -> pd.DataFrame:
+    try:
+        import pynvml
+    except (ImportError, ModuleNotFoundError):
+        logger.warning("pynvml can not be imported")
+        return pd.DataFrame({"type": list()})
+
+    try:
+        pynvml.nvmlInit()
+        device_count = pynvml.nvmlDeviceGetCount()
+    except pynvml.NVMLError as exc:
+        logger.warning(f"Unable to get NVIDIA devices with NVML: {exc}")
+        return pd.DataFrame({"type": list()})
+
+    driver_version = get_nvml_value(pynvml.nvmlSystemGetDriverVersion)
+    cuda_driver_version = None
+    if hasattr(pynvml, "nvmlSystemGetCudaDriverVersion_v2"):
+        cuda_driver_version = get_nvml_value(
+            pynvml.nvmlSystemGetCudaDriverVersion_v2
+        )
+    elif hasattr(pynvml, "nvmlSystemGetCudaDriverVersion"):
+        cuda_driver_version = get_nvml_value(pynvml.nvmlSystemGetCudaDriverVersion)
+    cuda_driver_version = format_cuda_driver_version(cuda_driver_version)
+
+    devices = {}
+    for device_index in range(device_count):
+        try:
+            handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
+        except pynvml.NVMLError as exc:
+            logger.warning(
+                f"Unable to get NVIDIA device {device_index} handle with NVML: {exc}"
+            )
+            continue
+
+        device_info = {
+            "name": get_nvml_value(pynvml.nvmlDeviceGetName, handle),
+            "vendor": "NVIDIA Corporation",
+            "type": "gpu",
+            "driver version": driver_version,
+            "cuda driver version": cuda_driver_version,
+            "index": device_index,
+        }
+
+        memory_info = get_nvml_value(pynvml.nvmlDeviceGetMemoryInfo, handle)
+        if memory_info is not None:
+            device_info["memory size[GB]"] = round(memory_info.total / 2**30)
+
+        uuid = get_nvml_value(pynvml.nvmlDeviceGetUUID, handle)
+        if uuid is not None:
+            device_info["uuid"] = uuid
+
+        pci_info = get_nvml_value(pynvml.nvmlDeviceGetPciInfo, handle)
+        if pci_info is not None:
+            bus_id = decode_nvml_value(getattr(pci_info, "busId", None))
+            if bus_id is not None:
+                device_info["pci bus id"] = bus_id
+
+        if hasattr(pynvml, "nvmlDeviceGetCudaComputeCapability"):
+            compute_capability = get_nvml_value(
+                pynvml.nvmlDeviceGetCudaComputeCapability, handle
+            )
+            if compute_capability is not None:
+                device_info["cuda compute capability"] = ".".join(
+                    map(str, compute_capability)
+                )
+
+        devices[f"cuda:{device_index}"] = device_info
+
+    if len(devices) > 0:
+        return pd.DataFrame(devices).T
+    else:
+        logger.warning("NVML device table is empty")
+    return pd.DataFrame({"type": list()})
+
+
 def get_higher_isa(cpu_flags: str) -> str:
     # TODO: add non-x86 sets
     ordered_sets = ["avx512", "avx2", "avx", "sse4_2", "ssse3", "sse2"]
@@ -165,6 +259,9 @@ def get_hardware_info() -> Dict:
     oneapi_devices = get_oneapi_devices()
     if len(oneapi_devices) > 0:
         logger.info(f"DPCTL listed devices:\n{oneapi_devices}\n")
+    nvidia_devices = get_nvidia_devices()
+    if len(nvidia_devices) > 0:
+        logger.info(f"NVML listed NVIDIA devices:\n{nvidia_devices}\n")
     # CPU
     try:
         from cpuinfo import get_cpu_info
@@ -197,6 +294,11 @@ def get_hardware_info() -> Dict:
         result["GPU(s)"].update(oneapi_gpus.T.to_dict())
     except (ImportError, ModuleNotFoundError):
         logger.warning('Unable to get devices with "dpctl" module')
+    try:
+        nvidia_gpus = nvidia_devices[nvidia_devices["type"] == "gpu"]
+        result["GPU(s)"].update(nvidia_gpus.T.to_dict())
+    except (ImportError, ModuleNotFoundError):
+        logger.warning('Unable to get NVIDIA devices with "pynvml" module')
     # RAM size
     try:
         import psutil
