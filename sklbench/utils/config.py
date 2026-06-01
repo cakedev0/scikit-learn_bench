@@ -17,6 +17,7 @@
 import argparse
 import json
 import os
+import re
 from copy import deepcopy
 from typing import Dict, List, Union
 
@@ -34,6 +35,20 @@ from .special_params import (
     assign_template_special_values,
     explain_range,
 )
+
+
+_INCLUDE_MODELS_TEMPLATE_PATTERN = re.compile(
+    r"\[SKBENCH_MODELS_TEMPLATE=([^\]]*)\]"
+)
+
+
+def resolve_include_config_path(include_config: str) -> str:
+    def replace_models_template(match: re.Match) -> str:
+        return os.environ.get("SKBENCH_MODELS_TEMPLATE") or match.group(1)
+
+    return _INCLUDE_MODELS_TEMPLATE_PATTERN.sub(
+        replace_models_template, include_config
+    )
 
 
 def find_configs(paths: Union[List[str], str, None]) -> List[str]:
@@ -154,6 +169,7 @@ def parse_config_file(
         config_dir = os.path.dirname(config_path)
         include_content = dict()
         for include_config in config_content["INCLUDE"]:
+            include_config = resolve_include_config_path(include_config)
             include_path = os.path.join(config_dir, include_config)
             if os.path.isfile(include_path):
                 with open(include_path, "r") as include_file:
