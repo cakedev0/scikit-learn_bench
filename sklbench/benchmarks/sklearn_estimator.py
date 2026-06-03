@@ -110,7 +110,7 @@ def get_number_of_classes(estimator_instance, y):
     elif class_weight is not None and hasattr(class_weight, "__len__"):
         return len(class_weight)
     else:
-        return len(np.unique(y))
+        return len(np.unique(convert_to_numpy(y)))
 
 
 def get_subset_metrics_of_estimator(
@@ -224,7 +224,7 @@ def get_subset_metrics_of_estimator(
                         )
                     }
                 )
-            if len(np.unique(y)) < 128:
+            if len(np.unique(y_compat)) < 128:
                 metrics.update(
                     {
                         "homogeneity": (
