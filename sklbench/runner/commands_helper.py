@@ -98,7 +98,11 @@ def run_benchmark_from_case(
 ) -> Tuple[int, List[Dict]]:
     command = generate_benchmark_command(bench_case, filters, log_level)
     logger.debug(f"Benchmark wrapper call command:\n{command}")
-    return_code, stdout, stderr = read_output_from_command(command)
+    bench_time_limit = get_bench_case_value(bench_case, "bench:time_limit", 3600)
+    command_timeout = bench_time_limit * 1.5 + 10
+    return_code, stdout, stderr = read_output_from_command(
+        command, timeout=command_timeout
+    )
 
     # filter cuML stdout verbosity
     suffixes_to_skip = ["[W]", "[I]", "[CUML]"]

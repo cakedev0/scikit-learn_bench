@@ -23,7 +23,7 @@ import subprocess as sp
 import warnings
 from pprint import pformat
 from shutil import get_terminal_size
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -59,14 +59,24 @@ def custom_format(
     return output
 
 
-def read_output_from_command(command: str) -> Tuple[int, str, str]:
+def read_output_from_command(
+    command: str, timeout: Optional[float] = None
+) -> Tuple[int, str, str]:
     """Executes command and returns code, stdout and stderr"""
-    res = sp.run(
-        command.split(" "),
-        stdout=sp.PIPE,
-        stderr=sp.PIPE,
-        encoding="utf-8",
-    )
+    try:
+        res = sp.run(
+            command.split(" "),
+            stdout=sp.PIPE,
+            stderr=sp.PIPE,
+            encoding="utf-8",
+            timeout=timeout,
+        )
+    except sp.TimeoutExpired as exc:
+        stdout = exc.stdout or ""
+        stderr = exc.stderr or ""
+        timeout_message = f"Command timed out after {timeout} seconds."
+        stderr = f"{stderr.strip()}\n{timeout_message}".strip()
+        return -9, stdout.strip(), stderr
     return (
         res.returncode,
         res.stdout.strip(),
