@@ -33,6 +33,7 @@ from sklearn.datasets import (
 
 from .common import cache, load_data_description, load_data_from_cache, preprocess
 from .downloaders import download_and_read_csv, load_openml, retrieve
+from .synthetic import make_trees_classification_data, make_trees_regression_data
 
 
 @preprocess
@@ -60,6 +61,8 @@ def load_sklearn_synthetic_data(
     functions_map = {
         "make_classification": make_classification,
         "make_regression": make_regression,
+        "make_trees_classification_data": make_trees_classification_data,
+        "make_trees_regression_data": make_trees_regression_data,
         "make_blobs": make_blobs,
         "make_moons": make_moons,
         "make_circles": make_circles,
@@ -73,7 +76,7 @@ def load_sklearn_synthetic_data(
         )
     x, y = functions_map[function_name](**generation_kwargs)
     data_desc = dict()
-    if function_name == "make_classification":
+    if function_name in ("make_classification", "make_trees_classification_data"):
         data_desc["n_classes"] = generation_kwargs["n_classes"]
         data_desc["n_clusters_per_class"] = generation_kwargs.get(
             "n_clusters_per_class", 2
