@@ -175,6 +175,14 @@ def assign_case_special_values_on_run(
                     "Skipping setting of 'target_offload' for CPU device "
                     "to avoid extra overheads"
                 )
+            elif get_bench_case_value(
+                bench_case, "algorithm:sklearnex_context:array_api_dispatch", False
+            ) or get_bench_case_value(
+                bench_case, "algorithm:sklearn_context:array_api_dispatch", False
+            ):
+                logger.debug(
+                    f'Using device specification "{device}" for array API input arrays'
+                )
             else:
                 set_bench_case_value(
                     bench_case, "algorithm:sklearnex_context:target_offload", device
