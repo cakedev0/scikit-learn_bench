@@ -101,9 +101,10 @@ def call_benchmarks(
     filters: List[BenchCase],
     log_level: str = "WARNING",
     early_exit: bool = False,
-) -> Tuple[int, List[Dict]]:
+) -> Tuple[int, List[Dict], List[Dict]]:
     """Iterates over benchmarking cases with progress bar and combines their results"""
     results = list()
+    failed_cases = list()
     return_code = 0
     bench_cases_with_pbar = tqdm(bench_cases)
     for bench_case in bench_cases_with_pbar:
@@ -113,22 +114,38 @@ def call_benchmarks(
             )
         )
         try:
-            bench_return_code, bench_entries = run_benchmark_from_case(
+            bench_return_code, bench_entries, failed_case = run_benchmark_from_case(
                 bench_case, filters, log_level
             )
             if bench_return_code != 0:
                 return_code = bench_return_code
+                if failed_case is not None:
+                    failed_cases.append(failed_case)
                 if early_exit:
                     break
             results.extend(bench_entries)
         except KeyboardInterrupt:
             return_code = -1
             break
-    return return_code, results
+        except Exception as exc:
+            return_code = -1
+            failed_cases.append(
+                {
+                    "case": bench_case,
+                    "return_code": return_code,
+                    "error": repr(exc),
+                    "logs": {"stdout": "", "stderr": str(exc)},
+                }
+            )
+            logger.warning(f"Benchmark failed before subprocess execution: {exc}")
+            if early_exit:
+                break
+    return return_code, results, failed_cases
 
 
 def save_results(
     bench_cases: List[Dict],
+    failed_cases: List[Dict],
     env_name: str,
     env_info: Dict,
     results_dir: str,
@@ -147,7 +164,7 @@ def save_results(
     except FileExistsError:
         pass
 
-    result = {"bench_cases": bench_cases}
+    result = {"bench_cases": bench_cases, "failed_cases": failed_cases}
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     result_file = bench_results_dir / f"{result_file_prefix}_{timestamp}.json"
     with open(result_file, "x") as fp:
@@ -190,7 +207,7 @@ def run_benchmarks(args: argparse.Namespace) -> int:
             pool.map(load_data_with_cleanup, dataset_cases.values())
 
     # run bench_cases
-    return_code, result = call_benchmarks(
+    return_code, result, failed_cases = call_benchmarks(
         bench_cases,
         param_filters,
         args.bench_log_level,
@@ -201,6 +218,8 @@ def run_benchmarks(args: argparse.Namespace) -> int:
     logger.debug(custom_format(result))
 
     # save results to append-only results directory
-    save_results(result, env_name, env_info, args.results_dir, result_file_prefix)
+    save_results(
+        result, failed_cases, env_name, env_info, args.results_dir, result_file_prefix
+    )
 
     return return_code

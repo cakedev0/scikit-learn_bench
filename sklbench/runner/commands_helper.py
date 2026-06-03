@@ -18,7 +18,7 @@ import json
 import os
 import sys
 from time import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from ..utils.bench_case import get_bench_case_name, get_bench_case_value
 from ..utils.common import custom_format, hash_from_json_repr, read_output_from_command
@@ -93,9 +93,36 @@ def generate_benchmark_command(
     )
 
 
+def extract_json_result(stdout: str) -> Tuple[Optional[List[Dict]], str]:
+    try:
+        result = json.loads(stdout)
+        if isinstance(result, list):
+            return result, ""
+        return None, stdout
+    except json.JSONDecodeError:
+        pass
+
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(stdout):
+        if char != "[":
+            continue
+        try:
+            result, end = decoder.raw_decode(stdout[index:])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(result, list):
+            continue
+        stdout_log = (
+            f"{stdout[:index].strip()}\n"
+            f"{stdout[index + end:].strip()}"
+        ).strip()
+        return result, stdout_log
+    return None, stdout
+
+
 def run_benchmark_from_case(
     bench_case: BenchCase, filters: List[BenchCase], log_level: str
-) -> Tuple[int, List[Dict]]:
+) -> Tuple[int, List[Dict], Optional[Dict]]:
     command = generate_benchmark_command(bench_case, filters, log_level)
     logger.debug(f"Benchmark wrapper call command:\n{command}")
     bench_time_limit = get_bench_case_value(bench_case, "bench:time_limit", 3600)
@@ -114,19 +141,31 @@ def run_benchmark_from_case(
         ]
     )
 
+    logs = {"stdout": "", "stderr": stderr}
+
     if stdout != "":
         logger.debug(f'{custom_format("Benchmark stdout:", bcolor="OKBLUE")}\n{stdout}')
     if return_code == 0:
         if stderr.strip() != "":
             logger.warning(f"Benchmark stderr:\n{stderr}")
-        try:
-            result = json.loads(stdout)
-        except json.JSONDecodeError:
+        result, logs["stdout"] = extract_json_result(stdout)
+        if result is None:
             logger.warning("Unable to read benchmark output in json format.")
             return_code = -1
             result = list()
+        for result_entry in result:
+            result_entry["logs"] = logs.copy()
     else:
         logger.warning(f"Benchmark returned non-zero code={return_code}.")
         logger.warning(f"Benchmark stderr:\n{stderr}")
         result = list()
-    return return_code, result
+    failed_case = None
+    if return_code != 0:
+        logs["stdout"] = stdout
+        failed_case = {
+            "case": bench_case,
+            "return_code": return_code,
+            "command": command,
+            "logs": logs,
+        }
+    return return_code, result, failed_case
