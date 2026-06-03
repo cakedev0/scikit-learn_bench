@@ -17,6 +17,8 @@
 
 import argparse
 import json
+import os
+import re
 from datetime import datetime, timezone
 from multiprocessing import Pool
 from pathlib import Path
@@ -28,11 +30,48 @@ from tqdm import tqdm
 from ..datasets import load_data_with_cleanup
 from ..utils.bench_case import get_bench_case_name, get_data_name
 from ..utils.common import custom_format, hash_from_json_repr
-from ..utils.config import early_filtering, generate_bench_cases, generate_bench_filters
+from ..utils.config import (
+    early_filtering,
+    find_configs,
+    generate_bench_cases,
+    generate_bench_filters,
+)
 from ..utils.custom_types import BenchCase
 from ..utils.env import get_environment_info
 from ..utils.logger import logger
 from .commands_helper import run_benchmark_from_case
+
+
+def _sanitize_filename_part(value: str) -> str:
+    value = re.sub(r"[^A-Za-z0-9_.-]+", "-", value.strip())
+    return value.strip(".-") or "unknown"
+
+
+def get_result_file_prefix(args: argparse.Namespace) -> str:
+    config_files = find_configs(args.config)
+    if config_files:
+        config_names = [
+            _sanitize_filename_part(Path(config_file).stem)
+            for config_file in config_files
+        ]
+        prefix = "+".join(config_names)
+    else:
+        prefix = "results"
+
+    models_template = os.environ.get("SKBENCH_MODELS_TEMPLATE")
+    if models_template:
+        prefix = f"{prefix}-{_sanitize_filename_part(models_template)}"
+    return prefix
+
+
+def get_env_name(env_info: Dict) -> str:
+    env_hash = hash_from_json_repr(env_info, hash_limit=6)
+    pixi_env_name = os.environ.get("PIXI_ENV_NAME") or os.environ.get(
+        "PIXI_ENVIRONMENT_NAME"
+    )
+    if pixi_env_name:
+        return f"{_sanitize_filename_part(pixi_env_name)}-{env_hash}"
+    return env_hash
 
 
 def call_benchmarks(
@@ -66,7 +105,13 @@ def call_benchmarks(
     return return_code, results
 
 
-def save_results(bench_cases: List[Dict], env_name: str, env_info: Dict, results_dir: str):
+def save_results(
+    bench_cases: List[Dict],
+    env_name: str,
+    env_info: Dict,
+    results_dir: str,
+    result_file_prefix: str,
+):
     results_root = Path(results_dir)
     env_dir = results_root / "envs"
     bench_results_dir = results_root / env_name
@@ -82,7 +127,7 @@ def save_results(bench_cases: List[Dict], env_name: str, env_info: Dict, results
 
     result = {"bench_cases": bench_cases}
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    result_file = bench_results_dir / f"results_{timestamp}.json"
+    result_file = bench_results_dir / f"{result_file_prefix}_{timestamp}.json"
     with open(result_file, "x") as fp:
         json.dump(result, fp, indent=4)
     logger.warning(f"Benchmark results saved to {result_file}")
@@ -97,7 +142,8 @@ def run_benchmarks(args: argparse.Namespace) -> int:
     logger.setLevel(args.runner_log_level)
 
     env_info = get_environment_info()
-    env_name = hash_from_json_repr(env_info, hash_limit=6)
+    env_name = get_env_name(env_info)
+    result_file_prefix = get_result_file_prefix(args)
 
     # find and parse configs
     bench_cases = generate_bench_cases(args)
@@ -133,6 +179,6 @@ def run_benchmarks(args: argparse.Namespace) -> int:
     logger.debug(custom_format(result))
 
     # save results to append-only results directory
-    save_results(result, env_name, env_info, args.results_dir)
+    save_results(result, env_name, env_info, args.results_dir, result_file_prefix)
 
     return return_code

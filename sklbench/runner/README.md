@@ -53,13 +53,14 @@ Results are written under `results/` by default:
 ```text
 results/
   envs/
-    <env_name>.json
-  <env_name>/
-    results_<YYYYMMDDTHHMMSSffffffZ>.json
+    [<pixi_env>-]<env_hash>.json
+  [<pixi_env>-]<env_hash>/
+    <config_name>[-<SKBENCH_MODELS_TEMPLATE>]_<YYYYMMDDTHHMMSSZ>.json
 ```
 
-The environment name is the SHA-256 hash of the environment metadata. Environment
-files contain the raw environment metadata. Timestamped results files contain
-`{"bench_cases": [...]}`.
+The environment directory and metadata filename include the Pixi environment
+name when available, followed by the SHA-256 hash of the environment metadata.
+Environment files contain the raw environment metadata. Timestamped results
+files contain `{"bench_cases": [...]}`.
 ---
 [Documentation tree](../../README.md#-documentation)

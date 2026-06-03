@@ -99,7 +99,7 @@ def add_speedups_parser(parser):
         "result_files",
         nargs="+",
         type=Path,
-        help="Input results_<datetime>.json files.",
+        help="Input result files ending with _<datetime>.json.",
     )
 
 
@@ -186,8 +186,10 @@ def discover_result_files(base_result_files: List[ResultFile]) -> List[ResultFil
     seen_paths = set()
     roots = sorted({result_file.path.parent.parent for result_file in base_result_files})
     for root in roots:
-        for path in sorted(root.glob("*/results_*.json")):
+        for path in sorted(root.glob("*/*.json")):
             if path.parent.name == "envs" or path in seen_paths:
+                continue
+            if not RESULT_FILE_RE.match(path.name):
                 continue
             result_file = load_result_file(path)
             if hardware_key(result_file) != base_hardware_key:

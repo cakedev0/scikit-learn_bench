@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 
-RESULT_FILE_RE = re.compile(r"^results_(\d{8}T\d{6}(?:\d{6})?Z)\.json$")
+RESULT_FILE_RE = re.compile(r"^(?:.+_)?(\d{8}T\d{6}(?:\d{6})?Z)\.json$")
 
 
 @dataclass(frozen=True)
@@ -39,7 +39,7 @@ def parse_result_timestamp(path: Path) -> datetime:
     match = RESULT_FILE_RE.match(path.name)
     if not match:
         raise ValueError(
-            f"Result filename '{path}' does not match results_<datetime>.json"
+            f"Result filename '{path}' does not end with _<datetime>.json"
         )
     timestamp = match.group(1)
     date_format = "%Y%m%dT%H%M%S%fZ" if len(timestamp) == 22 else "%Y%m%dT%H%M%SZ"
