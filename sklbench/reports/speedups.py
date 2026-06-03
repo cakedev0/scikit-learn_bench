@@ -36,6 +36,16 @@ from .common import (
 
 
 PLOTLY_CDN = "https://cdn.plot.ly/plotly-2.35.2.min.js"
+MAX_BINS_MARKER_SYMBOLS = [
+    "circle",
+    "x",
+    "cross",
+    "diamond",
+    "square",
+    "triangle-up",
+    "triangle-down",
+    "star",
+]
 
 
 @dataclass
@@ -109,6 +119,9 @@ def match_key(case: Dict[str, Any], environment: Dict[str, Any]) -> str:
         excluded_names={"library", "device", "sklearnex_context"},
         excluded_prefixes=("sklearn_context",),
     )
+    estimator_params = algorithm.get("estimator_params")
+    if isinstance(estimator_params, dict):
+        estimator_params.pop("max_bins", None)
     data = without_keys(case.get("data", {}), excluded_names={"format"})
     return stable_json(
         {
@@ -327,6 +340,14 @@ def point_hover(point: Point) -> str:
     )
 
 
+def point_max_bins(point: Point) -> Any:
+    return (
+        point.case.get("algorithm", {})
+        .get("estimator_params", {})
+        .get("max_bins")
+    )
+
+
 def data_params_for_display(case: Dict[str, Any]) -> Dict[str, Any]:
     return without_keys(
         case.get("data", {}),
@@ -423,31 +444,49 @@ def variant_offsets(variants: List[str]) -> Dict[str, float]:
     }
 
 
+def max_bins_label(max_bins: Any) -> str:
+    if max_bins is None:
+        return "max_bins: default"
+    return f"max_bins: {hover_value(max_bins)}"
+
+
+def max_bins_symbols(points: List[Point]) -> Dict[str, str]:
+    labels = sorted({max_bins_label(point_max_bins(point)) for point in points})
+    return {
+        label: MAX_BINS_MARKER_SYMBOLS[index % len(MAX_BINS_MARKER_SYMBOLS)]
+        for index, label in enumerate(labels)
+    }
+
+
 def build_traces(
     points: List[Point],
     method: str,
     estimator_positions: Dict[str, int],
     offsets: Dict[str, float],
+    marker_symbols: Dict[str, str],
 ) -> List[Dict[str, Any]]:
     grouped = {}
     for point in points:
         if point.method != method:
             continue
-        grouped.setdefault((point.target_variant, point.stale), []).append(point)
+        max_bins = max_bins_label(point_max_bins(point))
+        grouped.setdefault((point.target_variant, max_bins, point.stale), []).append(
+            point
+        )
 
     traces = []
-    for (variant, stale), group_points in sorted(grouped.items()):
+    for (variant, max_bins, stale), group_points in sorted(grouped.items()):
         group_points = sorted(
             group_points, key=lambda point: (point.name, point.target_variant)
         )
-        marker = {"size": 10}
+        marker = {"size": 10, "symbol": marker_symbols[max_bins]}
         if stale:
             marker["color"] = "rgba(220, 20, 20, 0.45)"
         traces.append(
             {
                 "type": "scatter",
                 "mode": "markers",
-                "name": variant + (" [stale]" if stale else ""),
+                "name": f"{variant} ({max_bins})" + (" [stale]" if stale else ""),
                 "x": [
                     estimator_positions[point.name] + offsets[point.target_variant]
                     for point in group_points
@@ -506,6 +545,7 @@ def render_html(
     }
     variants = sorted({point.target_variant for point in points})
     offsets = variant_offsets(variants)
+    marker_symbols = max_bins_symbols(points)
     methods = [
         method
         for method in ("fit", "predict")
@@ -520,7 +560,7 @@ def render_html(
             f"<div id=\"{chart_id}\" class=\"chart\"></div></section>"
         )
         traces_json = json.dumps(
-            build_traces(points, method, estimator_positions, offsets)
+            build_traces(points, method, estimator_positions, offsets, marker_symbols)
         ).replace("</", "<\\/")
         layout_json = json.dumps(build_layout(base_variant, method, estimators)).replace(
             "</", "<\\/"
