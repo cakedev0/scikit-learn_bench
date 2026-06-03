@@ -47,6 +47,20 @@ def _sanitize_filename_part(value: str) -> str:
     return value.strip(".-") or "unknown"
 
 
+def _models_template_from_config(config_file: str) -> str | None:
+    try:
+        with open(config_file, "r") as fp:
+            config_content = json.load(fp)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    for include_config in config_content.get("INCLUDE", []):
+        match = re.search(r"\[SKBENCH_MODELS_TEMPLATE=([^\]]*)\]", include_config)
+        if match:
+            return match.group(1)
+    return None
+
+
 def get_result_file_prefix(args: argparse.Namespace) -> str:
     config_files = find_configs(args.config)
     if config_files:
@@ -59,6 +73,14 @@ def get_result_file_prefix(args: argparse.Namespace) -> str:
         prefix = "results"
 
     models_template = os.environ.get("SKBENCH_MODELS_TEMPLATE")
+    if models_template is None:
+        models_templates = {
+            template
+            for config_file in config_files
+            if (template := _models_template_from_config(config_file)) is not None
+        }
+        if len(models_templates) == 1:
+            models_template = next(iter(models_templates))
     if models_template:
         prefix = f"{prefix}-{_sanitize_filename_part(models_template)}"
     return prefix
