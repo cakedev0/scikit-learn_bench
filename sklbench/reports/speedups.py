@@ -25,6 +25,7 @@ from statistics import median
 from typing import Any, Dict, List, Tuple
 
 from .common import (
+    RESULT_FILE_RE,
     ResultFile,
     case_name,
     implementation_variant,
@@ -36,16 +37,6 @@ from .common import (
 
 
 PLOTLY_CDN = "https://cdn.plot.ly/plotly-2.35.2.min.js"
-MAX_BINS_MARKER_SYMBOLS = [
-    "circle",
-    "x",
-    "cross",
-    "diamond",
-    "square",
-    "triangle-up",
-    "triangle-down",
-    "star",
-]
 
 
 @dataclass
@@ -67,7 +58,7 @@ class Point:
     case: Dict[str, Any]
     base_result_file: Path
     target_result_file: Path
-    log10_speedup: float
+    log2_speedup: float
     speedup: float
     base_time: float
     target_time: float
@@ -159,10 +150,22 @@ def flatten_records(result_files: List[ResultFile]) -> List[Record]:
     return records
 
 
-def keep_latest_records(records: List[Record]) -> Dict[Tuple[str, str, str], Record]:
+def ignored_match_params_key(case: Dict[str, Any]) -> str:
+    estimator_params = case.get("algorithm", {}).get("estimator_params", {})
+    if not isinstance(estimator_params, dict):
+        estimator_params = {}
+    return stable_json({"max_bins": estimator_params.get("max_bins")})
+
+
+def keep_latest_records(records: List[Record]) -> Dict[Tuple[str, str, str, str], Record]:
     latest = {}
     for record in records:
-        key = (record.match_key, record.variant, record.method)
+        key = (
+            record.match_key,
+            record.variant,
+            record.method,
+            ignored_match_params_key(record.case),
+        )
         current = latest.get(key)
         if (
             current is None
@@ -231,7 +234,7 @@ def select_base_variant(records: List[Record], requested_base: str | None) -> st
 
 def build_points(
     latest_base_records: Dict[Tuple[str, str], Record],
-    latest_target_records: Dict[Tuple[str, str, str], Record],
+    latest_target_records: Dict[Tuple[str, str, str, str], Record],
     base_variant: str,
     stale_days: float,
 ) -> Tuple[List[Point], int, List[Dict[str, Any]]]:
@@ -239,7 +242,9 @@ def build_points(
     unmatched = 0
     pair_timestamps = {}
 
-    for (key, variant, method), target_record in latest_target_records.items():
+    for (key, variant, method, _ignored_params), target_record in (
+        latest_target_records.items()
+    ):
         if variant == base_variant:
             continue
         base_record = latest_base_records.get((key, method))
@@ -257,7 +262,7 @@ def build_points(
             case=target_record.case,
             base_result_file=base_record.result_file.path,
             target_result_file=target_record.result_file.path,
-            log10_speedup=math.log10(speedup),
+            log2_speedup=math.log2(speedup),
             speedup=speedup,
             base_time=base_record.median_time,
             target_time=target_record.median_time,
@@ -340,14 +345,6 @@ def point_hover(point: Point) -> str:
     )
 
 
-def point_max_bins(point: Point) -> Any:
-    return (
-        point.case.get("algorithm", {})
-        .get("estimator_params", {})
-        .get("max_bins")
-    )
-
-
 def data_params_for_display(case: Dict[str, Any]) -> Dict[str, Any]:
     return without_keys(
         case.get("data", {}),
@@ -376,7 +373,7 @@ def csv_rows(points: List[Point], base_variant: str) -> List[Dict[str, Any]]:
                 "method": point.method,
                 "estimator": point.name,
                 "speedup": point.speedup,
-                "log10_speedup": point.log10_speedup,
+                "log2_speedup": point.log2_speedup,
                 "base_median_time_ms": point.base_time,
                 "target_median_time_ms": point.target_time,
                 "stale": point.stale,
@@ -410,7 +407,7 @@ def write_csv_report(points: List[Point], base_variant: str, path: Path) -> None
         "method",
         "estimator",
         "speedup",
-        "log10_speedup",
+        "log2_speedup",
         "base_median_time_ms",
         "target_median_time_ms",
         "stale",
@@ -444,17 +441,22 @@ def variant_offsets(variants: List[str]) -> Dict[str, float]:
     }
 
 
-def max_bins_label(max_bins: Any) -> str:
-    if max_bins is None:
-        return "max_bins: default"
-    return f"max_bins: {hover_value(max_bins)}"
+def point_has_max_bins(point: Point) -> bool:
+    estimator_params = point.case.get("algorithm", {}).get("estimator_params", {})
+    return isinstance(estimator_params, dict) and "max_bins" in estimator_params
 
 
-def max_bins_symbols(points: List[Point]) -> Dict[str, str]:
-    labels = sorted({max_bins_label(point_max_bins(point)) for point in points})
+def mixed_max_bins_columns(points: List[Point], method: str) -> set[Tuple[str, str]]:
+    column_has_max_bins = {}
+    for point in points:
+        if point.method != method:
+            continue
+        key = (point.name, point.target_variant)
+        column_has_max_bins.setdefault(key, set()).add(point_has_max_bins(point))
     return {
-        label: MAX_BINS_MARKER_SYMBOLS[index % len(MAX_BINS_MARKER_SYMBOLS)]
-        for index, label in enumerate(labels)
+        key
+        for key, has_max_bins_values in column_has_max_bins.items()
+        if has_max_bins_values == {False, True}
     }
 
 
@@ -463,35 +465,39 @@ def build_traces(
     method: str,
     estimator_positions: Dict[str, int],
     offsets: Dict[str, float],
-    marker_symbols: Dict[str, str],
 ) -> List[Dict[str, Any]]:
+    mixed_columns = mixed_max_bins_columns(points, method)
     grouped = {}
     for point in points:
         if point.method != method:
             continue
-        max_bins = max_bins_label(point_max_bins(point))
-        grouped.setdefault((point.target_variant, max_bins, point.stale), []).append(
-            point
-        )
+        grouped.setdefault((point.target_variant, point.stale), []).append(point)
 
     traces = []
-    for (variant, max_bins, stale), group_points in sorted(grouped.items()):
+    for (variant, stale), group_points in sorted(grouped.items()):
         group_points = sorted(
             group_points, key=lambda point: (point.name, point.target_variant)
         )
-        marker = {"size": 10, "symbol": marker_symbols[max_bins]}
+        marker_symbols = [
+            "x"
+            if point_has_max_bins(point)
+            and (point.name, point.target_variant) in mixed_columns
+            else "circle"
+            for point in group_points
+        ]
+        marker = {"size": 10, "symbol": marker_symbols}
         if stale:
             marker["color"] = "rgba(220, 20, 20, 0.45)"
         traces.append(
             {
                 "type": "scatter",
                 "mode": "markers",
-                "name": f"{variant} ({max_bins})" + (" [stale]" if stale else ""),
+                "name": variant + (" [stale]" if stale else ""),
                 "x": [
                     estimator_positions[point.name] + offsets[point.target_variant]
                     for point in group_points
                 ],
-                "y": [point.log10_speedup for point in group_points],
+                "y": [point.log2_speedup for point in group_points],
                 "text": [point_hover(point) for point in group_points],
                 "hovertemplate": "%{text}<extra></extra>",
                 "marker": marker,
@@ -504,7 +510,17 @@ def build_layout(
     base_variant: str,
     method: str,
     estimators: List[str],
+    points: List[Point],
 ) -> Dict[str, Any]:
+    values = [point.log2_speedup for point in points if point.method == method]
+    if values:
+        min_tick = math.floor(min(min(values), 0))
+        max_tick = math.ceil(max(max(values), 0))
+    else:
+        min_tick = 0
+        max_tick = 0
+    tick_values = list(range(min_tick, max_tick + 1))
+    tick_text = [format_speedup_tick(2 ** tick) for tick in tick_values]
     return {
         "title": f"{method} speed-ups vs {base_variant}",
         "xaxis": {
@@ -514,7 +530,12 @@ def build_layout(
             "ticktext": estimators,
             "range": [-0.5, len(estimators) - 0.5],
         },
-        "yaxis": {"title": "log10 speed-up"},
+        "yaxis": {
+            "title": "speed-up",
+            "tickmode": "array",
+            "tickvals": tick_values,
+            "ticktext": tick_text,
+        },
         "shapes": [
             {
                 "type": "line",
@@ -531,6 +552,14 @@ def build_layout(
     }
 
 
+def format_speedup_tick(value: float) -> str:
+    if value >= 1:
+        return f"{value:g}"
+    if value >= 0.001:
+        return f"{value:.3f}".rstrip("0").rstrip(".")
+    return f"{value:.3g}"
+
+
 def render_html(
     points: List[Point],
     stale_pairs: List[Dict[str, Any]],
@@ -545,7 +574,6 @@ def render_html(
     }
     variants = sorted({point.target_variant for point in points})
     offsets = variant_offsets(variants)
-    marker_symbols = max_bins_symbols(points)
     methods = [
         method
         for method in ("fit", "predict")
@@ -560,11 +588,11 @@ def render_html(
             f"<div id=\"{chart_id}\" class=\"chart\"></div></section>"
         )
         traces_json = json.dumps(
-            build_traces(points, method, estimator_positions, offsets, marker_symbols)
+            build_traces(points, method, estimator_positions, offsets)
         ).replace("</", "<\\/")
-        layout_json = json.dumps(build_layout(base_variant, method, estimators)).replace(
-            "</", "<\\/"
-        )
+        layout_json = json.dumps(
+            build_layout(base_variant, method, estimators, points)
+        ).replace("</", "<\\/")
         chart_scripts.append(
             f"Plotly.newPlot(\"{chart_id}\", {traces_json}, {layout_json}, "
             "{responsive: true});"

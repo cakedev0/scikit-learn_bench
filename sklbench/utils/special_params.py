@@ -96,6 +96,25 @@ def assign_template_special_values(template: BenchTemplate) -> BenchTemplate:
 
 
 def assign_case_special_values_on_generation(bench_case: BenchCase) -> BenchCase:
+    # estimator max_bins as the generated dataset sample count
+    max_bins = get_bench_case_value(
+        bench_case, "algorithm:estimator_params:max_bins"
+    )
+    if is_special_value(max_bins):
+        max_bins = max_bins.replace(SP_VALUE_STR, "")
+        if max_bins != "n_samples":
+            raise ValueError(f'Unknown special value "{max_bins}" for max_bins')
+        n_samples = get_bench_case_value(
+            bench_case, "data:generation_kwargs:n_samples"
+        )
+        if n_samples is None:
+            raise ValueError(
+                '"n_samples" is not specified for special value of "max_bins"'
+            )
+        set_bench_case_value(
+            bench_case, "algorithm:estimator_params:max_bins", n_samples
+        )
+
     # sklearn.datasets.make_classification: n_informative as ratio of n_features
     n_informative = get_bench_case_value(
         bench_case, "data:generation_kwargs:n_informative"
