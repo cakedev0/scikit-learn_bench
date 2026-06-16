@@ -112,18 +112,15 @@ def stable_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
 
-def implementation_variant(
-    algorithm: Dict[str, Any],
-    data: Dict[str, Any] | None = None,
-) -> str:
-    library = algorithm.get("library")
-    device = algorithm.get("device")
+def implementation_variant(implementation: Dict[str, Any]) -> str:
+    library = implementation.get("library")
+    device = implementation.get("device")
     if device in (None, "default"):
         return library
     if library == "sklearn":
-        data_format = (data or {}).get("format")
-        if data_format is not None:
-            return f"{library}-{data_format}-{device}"
+        data_library = implementation.get("data_library")
+        if data_library is not None:
+            return f"{library}-{data_library}-{device}"
     return f"{library}-{device}"
 
 

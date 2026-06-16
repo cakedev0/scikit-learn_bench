@@ -310,10 +310,12 @@ def early_filtering(
     def get_early_filter(original_filter):
         static_params = [
             "data",
-            "algorithm:library",
+            "implementation",
+            "implementation:library",
+            "implementation:device",
+            "implementation:data_library",
             "algorithm:estimator",
             "algorithm:function",
-            "algorithm:device",
         ]
         early_filter = dict()
         for static_param in static_params:

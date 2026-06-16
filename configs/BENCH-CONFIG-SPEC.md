@@ -58,7 +58,7 @@ Example
     "TEMPLATES": {
         "linear regression": {
             "SETS": ["estimator parameters", "regression data"],
-            "algorithm": {
+            "implementation": {
                 "library": ["sklearn", "sklearnex", "cuml"]
             }
         }
@@ -97,13 +97,15 @@ Configs have the three highest parameter keys:
 | `data`:`preprocessing_kwargs`:`normalize` | None | None, `mean`, `minmax`, `standard` | Enables normalization of preprocessed data. |
 | `data`:`preprocessing_kwargs`:`force_for_sparse` | True |  | Forces preprocessing for sparse data formats. |
 | `data`:`split_kwargs` | Empty `dict` or default split from dataset description |  | Data split parameters for `train_test_split` function. |
-| `data`:`format` | `pandas` | `pandas`, `numpy`, `cudf` | Data format to use in benchmark. |
 | `data`:`order` | `F` | `C`, `F` | Data order to use in benchmark: contiguous(C) or Fortran. |
 | `data`:`dtype` | `float64` |  | Data type to use in benchmark. |
 | `data`:`distributed_split` | None | None, `rank_based` | Split type used to distribute data between machines in distributed algorithm. `None` type means usage of all data without split on all machines. `rank_based` type splits the data equally between machines with split sequence based on rank id from MPI. |
-|<h3>Algorithm parameters</h3>||||
-| `algorithm`:`library` | None |  | Python module containing measured entity (class or function). |
-| `algorithm`:`device` | `default` | `default`, `cpu`, `gpu` | Device selected for computation. |
+|<h3>Implementation parameters</h3>||||
+| `implementation`:`library` | None |  | Python module containing measured entity (class or function). |
+| `implementation`:`device` | `default` | `default`, `cpu`, `gpu`, `cuda`, `xpu` | Device selected for computation. |
+| `implementation`:`data_library` | `pandas` | `numpy`, `pandas`, `torch`, `dpnp`, `cupy` | Array/dataframe library to use for benchmark inputs. |
+| `implementation`:`sklearn_context` | None |  | Parameters for sklearn `config_context` used over estimator. |
+| `implementation`:`sklearnex_context` | None |  | Parameters for sklearnex `config_context` used over estimator. Updated by `sklearn_context` if set. |
 
 ## Benchmark-Specific Parameters
 
@@ -114,8 +116,6 @@ Configs have the three highest parameter keys:
 | `algorithm`:`estimator` | None |  | Name of measured estimator. |
 | `algorithm`:`estimator_params` | Empty `dict` |  | Parameters for estimator constructor. |
 | `algorithm`:`batch_size`:`{stage}` | None | Any positive integer | Enables online mode for `{stage}` methods of estimator (sequential calls for each batch). |
-| `algorithm`:`sklearn_context` | None |  | Parameters for sklearn `config_context` used over estimator. |
-| `algorithm`:`sklearnex_context` | None |  | Parameters for sklearnex `config_context` used over estimator. Updated by `sklearn_context` if set. |
 | `bench`:`ensure_sklearnex_patching` | True |  | If True, warns about sklearnex patching failures. |
 
 ### `Function`

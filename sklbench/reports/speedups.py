@@ -128,8 +128,8 @@ def flatten_records(result_files: List[ResultFile]) -> List[Record]:
     for result_file in result_files:
         for bench_case in result_file.bench_cases:
             case = bench_case.get("case", {})
-            algorithm = case.get("algorithm", {})
-            variant = implementation_variant(algorithm, case.get("data", {}))
+            implementation = case.get("implementation", {})
+            variant = implementation_variant(implementation)
             name = case_name(case)
             key = match_key(case, result_file.environment)
             for method, result in bench_case.get("results", {}).items():
@@ -368,6 +368,7 @@ def csv_rows(points: List[Point], base_variant: str) -> List[Dict[str, Any]]:
         key=lambda point: (point.method, point.name, point.target_variant),
     ):
         algorithm = point.case.get("algorithm", {})
+        implementation = point.case.get("implementation", {})
         data = data_params_for_display(point.case)
         rows.append(
             {
@@ -385,10 +386,10 @@ def csv_rows(points: List[Point], base_variant: str) -> List[Dict[str, Any]]:
                 "base_result_file": str(point.base_result_file),
                 "target_result_file": str(point.target_result_file),
                 "algorithm_task": algorithm.get("task"),
-                "target_library": algorithm.get("library"),
-                "target_device": algorithm.get("device"),
+                "target_library": implementation.get("library"),
+                "target_device": implementation.get("device"),
                 "data_source": data.get("source"),
-                "data_format": data.get("format"),
+                "data_format": implementation.get("data_library"),
                 "estimator_params": compact_json(
                     algorithm.get("estimator_params", {})
                 ),

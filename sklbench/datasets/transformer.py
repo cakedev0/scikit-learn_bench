@@ -168,8 +168,10 @@ def split_and_transform_data(bench_case, data, data_description):
             x_train = x_train[train_start:train_end]
             x_test = x_test[test_start:test_end]
 
-    device = get_bench_case_value(bench_case, "algorithm:device", None)
-    common_data_format = get_bench_case_value(bench_case, "data:format", "pandas")
+    device = get_bench_case_value(bench_case, "implementation:device", None)
+    common_data_format = get_bench_case_value(
+        bench_case, "implementation:data_library", "pandas"
+    )
     common_data_order = get_bench_case_value(bench_case, "data:order", "F")
     common_data_dtype = get_bench_case_value(bench_case, "data:dtype", "float32")
 

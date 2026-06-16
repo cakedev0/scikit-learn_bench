@@ -278,7 +278,7 @@ def get_subset_metrics_of_estimator(
 
 def get_context(bench_case: BenchCase):
     sklearn_context, sklearnex_context = [
-        get_bench_case_value(bench_case, f"algorithm:{library}_context", None)
+        get_bench_case_value(bench_case, f"implementation:{library}_context", None)
         for library in ["sklearn", "sklearnex"]
     ]
     if sklearnex_context is not None:
@@ -333,7 +333,7 @@ def get_sklearnex_logging_stream() -> io.StringIO:
 
 def sklearnex_context_disallows_fallback(bench_case: BenchCase) -> bool:
     sklearnex_context = get_bench_case_value(
-        bench_case, "algorithm:sklearnex_context", dict()
+        bench_case, "implementation:sklearnex_context", dict()
     )
     if not isinstance(sklearnex_context, dict):
         return False
@@ -530,7 +530,7 @@ def measure_sklearn_estimator(
                     method_is_patched, patching_message = verify_patching(
                         sklearnex_logging_stream,
                         full_method_name,
-                        get_bench_case_value(bench_case, "algorithm:device"),
+                        get_bench_case_value(bench_case, "implementation:device"),
                     )
                     if not method_is_patched:
                         if fail_on_sklearnex_fallback:
@@ -555,7 +555,7 @@ def measure_sklearn_estimator(
 
 def main(bench_case: BenchCase, filters: List[BenchCase]):
     # get estimator class and ML task
-    library_name = get_bench_case_value(bench_case, "algorithm:library")
+    library_name = get_bench_case_value(bench_case, "implementation:library")
     estimator_name = get_bench_case_value(bench_case, "algorithm:estimator")
 
     estimator_class = get_estimator(library_name, estimator_name)

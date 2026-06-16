@@ -18,7 +18,10 @@ import argparse
 import json
 from typing import Dict
 
-from ..utils.bench_case import get_bench_case_value, get_data_name
+from ..utils.bench_case import (
+    get_bench_case_value,
+    get_data_name,
+)
 from ..utils.custom_types import BenchCase
 from ..utils.logger import logger
 
@@ -29,14 +32,14 @@ def enrich_result(result: Dict, bench_case: BenchCase) -> Dict:
     result.update(
         {
             "dataset": get_data_name(bench_case, shortened=True),
-            "library": get_bench_case_value(bench_case, "algorithm:library")
+            "library": get_bench_case_value(bench_case, "implementation:library")
             .replace(
                 # skipping emulators namespace for conciseness
                 "sklbench.emulators.",
                 "",
             )
             .replace(".utils", ""),
-            "device": get_bench_case_value(bench_case, "algorithm:device"),
+            "device": get_bench_case_value(bench_case, "implementation:device"),
         }
     )
     enable_modelbuilders = get_bench_case_value(

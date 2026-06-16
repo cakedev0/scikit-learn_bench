@@ -64,7 +64,7 @@ def get_function_args(bench_case: BenchCase, x_train, y_train, x_test, y_test) -
 
 
 def main(bench_case: BenchCase, filters: List[BenchCase]):
-    library_name = get_bench_case_value(bench_case, "algorithm:library")
+    library_name = get_bench_case_value(bench_case, "implementation:library")
     function_name = get_bench_case_value(bench_case, "algorithm:function")
 
     function_instance = get_function_instance(library_name, function_name)

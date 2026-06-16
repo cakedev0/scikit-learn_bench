@@ -292,7 +292,7 @@ def measure_case(case: BenchCase, func, *args, **kwargs):
         enable_cpu_profiling=get_bench_case_value(case, "bench:cpu_profile", False),
         enable_memory_profiling=get_bench_case_value(case, "bench:memory_profile", False),
         enable_nvml_profiling=(
-            get_bench_case_value(case, "algorithm:library") == "cuml"
+            get_bench_case_value(case, "implementation:library") == "cuml"
             and nvml_is_available
         ),
         cost_per_hour=get_bench_case_value(case, "bench:cost_per_hour", 0.0),

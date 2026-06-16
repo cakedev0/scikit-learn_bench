@@ -24,7 +24,10 @@ from psutil import cpu_count
 from sklearn.metrics import euclidean_distances
 
 from ..datasets import dataset_loading_functions
-from .bench_case import get_bench_case_value, set_bench_case_value
+from .bench_case import (
+    get_bench_case_value,
+    set_bench_case_value,
+)
 from .common import convert_to_numpy, flatten_list
 from .custom_types import BenchCase, BenchTemplate
 from .env import get_numa_cpus_conf
@@ -171,10 +174,16 @@ def assign_case_special_values_on_run(
     bench_case: BenchCase, data, data_description: Dict
 ):
     # Note: data = (x_train, y_train, x_test, y_train)
-    library = get_bench_case_value(bench_case, "algorithm:library", None)
+    library = get_bench_case_value(bench_case, "implementation:library", None)
     estimator = get_bench_case_value(bench_case, "algorithm:estimator", None)
     # device-related parameters assignment
-    device = get_bench_case_value(bench_case, "algorithm:device", "default")
+    device = get_bench_case_value(bench_case, "implementation:device", "default")
+    sklearn_context = get_bench_case_value(
+        bench_case, "implementation:sklearn_context", {}
+    )
+    sklearnex_context = get_bench_case_value(
+        bench_case, "implementation:sklearnex_context", {}
+    )
     if device != "default":
         # xgboost tree method assignment branch
         if library == "xgboost" and estimator in ["XGBRegressor", "XGBClassifier"]:
@@ -194,23 +203,31 @@ def assign_case_special_values_on_run(
                     "Skipping setting of 'target_offload' for CPU device "
                     "to avoid extra overheads"
                 )
-            elif get_bench_case_value(
-                bench_case, "algorithm:sklearnex_context:array_api_dispatch", False
-            ) or get_bench_case_value(
-                bench_case, "algorithm:sklearn_context:array_api_dispatch", False
+            elif (
+                isinstance(sklearnex_context, dict)
+                and sklearnex_context.get("array_api_dispatch", False)
+            ) or (
+                isinstance(sklearn_context, dict)
+                and sklearn_context.get("array_api_dispatch", False)
             ):
                 logger.debug(
                     f'Using device specification "{device}" for array API input arrays'
                 )
             else:
+                if not isinstance(sklearnex_context, dict):
+                    sklearnex_context = {}
+                sklearnex_context["target_offload"] = device
                 set_bench_case_value(
-                    bench_case, "algorithm:sklearnex_context:target_offload", device
+                    bench_case,
+                    "implementation:sklearnex_context",
+                    sklearnex_context,
                 )
         # faiss GPU algorithm selection
         elif library == "sklbench.emulators.faiss" and estimator == "NearestNeighbors":
             set_bench_case_value(bench_case, "algorithm:estimator_params:device", device)
-        elif library == "sklearn" and get_bench_case_value(
-            bench_case, "algorithm:sklearn_context:array_api_dispatch", False
+        elif library == "sklearn" and (
+            isinstance(sklearn_context, dict)
+            and sklearn_context.get("array_api_dispatch", False)
         ):
             logger.debug(
                 f'Using device specification "{device}" for array API input arrays'
@@ -223,7 +240,7 @@ def assign_case_special_values_on_run(
     )
     if tree_method == "gpu_hist":
         device = "gpu"
-    set_bench_case_value(bench_case, "algorithm:device", device)
+    set_bench_case_value(bench_case, "implementation:device", device)
     # n_jobs
     n_jobs = get_bench_case_value(bench_case, "algorithm:estimator_params:n_jobs", None)
     if is_special_value(n_jobs):

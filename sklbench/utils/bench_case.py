@@ -124,13 +124,13 @@ def get_data_name(bench_case: BenchCase, shortened: bool = False) -> str:
 def get_bench_case_name(
     bench_case: BenchCase, shortened: bool = False, separator: str = " "
 ) -> str:
-    library_name = get_bench_case_value(bench_case, "algorithm:library")
+    library_name = get_bench_case_value(bench_case, "implementation:library")
     alg_name = get_first_of_bench_case_values(
         bench_case, ["algorithm:estimator", "algorithm:function"]
     )
     data_name = get_data_name(bench_case, shortened)
     name_args = [library_name, alg_name, data_name]
-    device = get_bench_case_value(bench_case, "algorithm:device", None)
+    device = get_bench_case_value(bench_case, "implementation:device", None)
     if device is not None:
         name_args.append(device)
     return separator.join(name_args)
