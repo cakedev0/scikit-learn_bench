@@ -86,14 +86,33 @@ def get_result_file_prefix(args: argparse.Namespace) -> str:
     return prefix
 
 
-def get_env_name(env_info: Dict) -> str:
-    env_hash = hash_from_json_repr(env_info, hash_limit=6)
-    pixi_env_name = os.environ.get("PIXI_ENV_NAME") or os.environ.get(
-        "PIXI_ENVIRONMENT_NAME"
+def get_pixi_env_name(software_info: Dict) -> str:
+    return _sanitize_filename_part(software_info["pixi_environment_name"])
+
+
+def get_hardware_hash(hardware_info: Dict) -> str:
+    return hash_from_json_repr(hardware_info, hash_limit=6)
+
+
+def get_hardware_env_name(hardware_info: Dict) -> str:
+    hardware_hash = get_hardware_hash(hardware_info)
+    hardware_names_file = Path("hardware-names.json")
+    if hardware_names_file.is_file():
+        with open(hardware_names_file, "r") as fp:
+            hardware_names = json.load(fp)
+        hardware_name = hardware_names.get(hardware_hash)
+        if hardware_name:
+            return f"{_sanitize_filename_part(str(hardware_name))}-{hardware_hash}"
+    return hardware_hash
+
+
+def get_software_env_name(software_info: Dict) -> str:
+    pixi_env_name = get_pixi_env_name(software_info)
+    threadpool_hash = hash_from_json_repr(
+        software_info.get("threadpool_info", []), hash_limit=3
     )
-    if pixi_env_name:
-        return f"{_sanitize_filename_part(pixi_env_name)}-{env_hash}"
-    return env_hash
+    software_hash = hash_from_json_repr(software_info, hash_limit=6)
+    return f"{pixi_env_name}-{threadpool_hash}-{software_hash}"
 
 
 def call_benchmarks(
@@ -146,23 +165,30 @@ def call_benchmarks(
 def save_results(
     bench_cases: List[Dict],
     failed_cases: List[Dict],
-    env_name: str,
+    hardware_env_name: str,
+    software_env_name: str,
     env_info: Dict,
     results_dir: str,
     result_file_prefix: str,
 ):
     results_root = Path(results_dir)
-    env_dir = results_root / "envs"
-    bench_results_dir = results_root / env_name
-    env_dir.mkdir(parents=True, exist_ok=True)
+    hardware_env_dir = results_root / "hardware-envs"
+    software_env_dir = results_root / "software-envs"
+    bench_results_dir = results_root / hardware_env_name / software_env_name
+    hardware_env_dir.mkdir(parents=True, exist_ok=True)
+    software_env_dir.mkdir(parents=True, exist_ok=True)
     bench_results_dir.mkdir(parents=True, exist_ok=True)
 
-    env_file = env_dir / f"{env_name}.json"
-    try:
-        with open(env_file, "x") as fp:
-            json.dump(env_info, fp, indent=4)
-    except FileExistsError:
-        pass
+    env_files = [
+        (hardware_env_dir / f"{hardware_env_name}.json", env_info["hardware"]),
+        (software_env_dir / f"{software_env_name}.json", env_info["software"]),
+    ]
+    for env_file, env_content in env_files:
+        try:
+            with open(env_file, "x") as fp:
+                json.dump(env_content, fp, indent=4)
+        except FileExistsError:
+            pass
 
     result = {"bench_cases": bench_cases, "failed_cases": failed_cases}
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -181,7 +207,8 @@ def run_benchmarks(args: argparse.Namespace) -> int:
     logger.setLevel(args.runner_log_level)
 
     env_info = get_environment_info()
-    env_name = get_env_name(env_info)
+    hardware_env_name = get_hardware_env_name(env_info["hardware"])
+    software_env_name = get_software_env_name(env_info["software"])
     result_file_prefix = get_result_file_prefix(args)
 
     # find and parse configs
@@ -219,7 +246,13 @@ def run_benchmarks(args: argparse.Namespace) -> int:
 
     # save results to append-only results directory
     save_results(
-        result, failed_cases, env_name, env_info, args.results_dir, result_file_prefix
+        result,
+        failed_cases,
+        hardware_env_name,
+        software_env_name,
+        env_info,
+        args.results_dir,
+        result_file_prefix,
     )
 
     return return_code

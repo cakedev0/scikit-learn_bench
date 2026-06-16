@@ -50,17 +50,32 @@ def load_result_file(path: Path) -> ResultFile:
     if not path.is_file():
         raise FileNotFoundError(f"Result input must be a file: {path}")
 
-    env_name = path.parent.name
-    env_file = path.parent.parent / "envs" / f"{env_name}.json"
-    if not env_file.is_file():
-        raise FileNotFoundError(
-            f"Unable to find environment file for '{path}': expected {env_file}"
-        )
+    env_root = path.parent.parent.parent
+    hardware_env_name = path.parent.parent.name
+    software_env_name = path.parent.name
+    hardware_env_file = env_root / "hardware-envs" / f"{hardware_env_name}.json"
+    software_env_file = env_root / "software-envs" / f"{software_env_name}.json"
+
+    if hardware_env_file.is_file() and software_env_file.is_file():
+        env_name = f"{hardware_env_name}/{software_env_name}"
+        with open(hardware_env_file, "r") as fp:
+            hardware = json.load(fp)
+        with open(software_env_file, "r") as fp:
+            software = json.load(fp)
+        environment = {"hardware": hardware, "software": software}
+    else:
+        env_name = path.parent.name
+        env_file = path.parent.parent / "envs" / f"{env_name}.json"
+        if not env_file.is_file():
+            raise FileNotFoundError(
+                f"Unable to find environment files for '{path}': expected either "
+                f"{hardware_env_file} and {software_env_file}, or {env_file}"
+            )
+        with open(env_file, "r") as fp:
+            environment = json.load(fp)
 
     with open(path, "r") as fp:
         result = json.load(fp)
-    with open(env_file, "r") as fp:
-        environment = json.load(fp)
 
     if "bench_cases" not in result:
         raise ValueError(f"Result file '{path}' does not contain 'bench_cases'")

@@ -202,8 +202,11 @@ def discover_result_files(base_result_files: List[ResultFile]) -> List[ResultFil
     seen_paths = set()
     roots = sorted({result_file.path.parent.parent for result_file in base_result_files})
     for root in roots:
-        for path in sorted(root.glob("*/*.json")):
-            if path.parent.name == "envs" or path in seen_paths:
+        for path in sorted(root.rglob("*.json")):
+            if (
+                {"envs", "hardware-envs", "software-envs"} & set(path.parts)
+                or path in seen_paths
+            ):
                 continue
             if not RESULT_FILE_RE.match(path.name):
                 continue

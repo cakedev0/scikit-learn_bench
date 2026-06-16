@@ -26,6 +26,19 @@ from .common import read_output_from_command
 from .logger import logger
 
 
+def get_threadpool_info():
+    try:
+        from threadpoolctl import threadpool_info
+    except (ImportError, ModuleNotFoundError):
+        logger.warning('Unable to get threadpool info with "threadpoolctl" module')
+        return []
+
+    threadpools = threadpool_info()
+    for threadpool in threadpools:
+        threadpool.pop("filepath", None)
+    return threadpools
+
+
 def get_numa_cpus_conf() -> Dict[int, str]:
     try:
         _, lscpu_text, _ = read_output_from_command("lscpu")
@@ -78,51 +91,27 @@ def get_number_of_sockets():
 
 def get_software_info() -> Dict:
     result = dict()
+    result["threadpool_info"] = get_threadpool_info()
+
     # pixi list
     pixi_project_root = os.environ.get("PIXI_PROJECT_ROOT")
     pixi_environment_name = os.environ.get("PIXI_ENVIRONMENT_NAME")
-    if pixi_project_root and pixi_environment_name:
-        result["pixi_project_root"] = pixi_project_root
-        result["pixi_environment_name"] = pixi_environment_name
-        try:
-            pixi_list = subprocess.check_output(
-                [
-                    "pixi",
-                    "list",
-                    "--manifest-path",
-                    pixi_project_root,
-                    "--environment",
-                    pixi_environment_name,
-                    "--json",
-                ],
-                shell=False,
-                text=True,
-            )
-            pixi_packages = json.loads(pixi_list)
-            result["pixi_packages"] = {pkg.pop("name"): pkg for pkg in pixi_packages}
-            return result
-        except (
-            FileNotFoundError,
-            PermissionError,
-            subprocess.CalledProcessError,
-            json.JSONDecodeError,
-        ):
-            logger.warning("Unable to get python packages list via pixi")
-
-    # conda list
-    try:
-        _, conda_list, _ = read_output_from_command("conda list --json")
-        conda_packages = json.loads(conda_list)
-        result["conda_packages"] = {pkg.pop("name"): pkg for pkg in conda_packages}
-    # pip list
-    except (FileNotFoundError, PermissionError, AttributeError):
-        logger.warning("Unable to get python packages list via conda")
-        try:
-            _, pip_list, _ = read_output_from_command("pip list --format json")
-            pip_packages = json.loads(pip_list)
-            result["pip_packages"] = {pkg.pop("name"): pkg for pkg in pip_packages}
-        except (FileNotFoundError, PermissionError, AttributeError):
-            logger.warning("Unable to get python packages list via pip")
+    result["pixi_environment_name"] = pixi_environment_name
+    pixi_list = subprocess.check_output(
+        [
+            "pixi",
+            "list",
+            "--manifest-path",
+            pixi_project_root,
+            "--environment",
+            pixi_environment_name,
+            "--json",
+        ],
+        shell=False,
+        text=True,
+    )
+    pixi_packages = json.loads(pixi_list)
+    result["pixi_packages"] = {pkg.pop("name"): pkg for pkg in pixi_packages}
     return result
 
 

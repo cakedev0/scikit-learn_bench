@@ -9,15 +9,15 @@ Generate an interactive HTML speed-up report and a pandas-friendly CSV sidecar:
 ```bash
 python -m sklbench.reports speedups \
   --output speedups.html \
-  results/intel-69cd73/sklearnex-test_20260529T120640Z.json
+  results/small-laptop-69cd73/sklearnex-a1b-69cd73/sklearnex-test_20260529T120640Z.json
 ```
 
 The CSV defaults to the HTML output path with a `.csv` suffix. Use
 `--csv-output path/to/speedups.csv` to choose a different path.
 
 Inputs are baseline result files ending with `_<datetime>.json`. Each input file
-must be located in a result directory with a matching environment file at
-`../envs/<env_name>.json`.
+must be located in a result directory whose parent directory names point to
+matching environment files under `hardware-envs/` and `software-envs/`.
 
 If the baseline inputs contain exactly one implementation variant, it is used as
 the base automatically. If they contain multiple variants, pass `--base`.
