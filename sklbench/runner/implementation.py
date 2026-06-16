@@ -94,6 +94,10 @@ def get_hardware_hash(hardware_info: Dict) -> str:
     return hash_from_json_repr(hardware_info, hash_limit=6)
 
 
+def get_software_hash(software_info: Dict) -> str:
+    return hash_from_json_repr(software_info, hash_limit=6)
+
+
 def get_hardware_env_name(hardware_info: Dict) -> str:
     hardware_hash = get_hardware_hash(hardware_info)
     hardware_names_file = Path("hardware-names.json")
@@ -111,8 +115,19 @@ def get_software_env_name(software_info: Dict) -> str:
     threadpool_hash = hash_from_json_repr(
         software_info.get("threadpool_info", []), hash_limit=3
     )
-    software_hash = hash_from_json_repr(software_info, hash_limit=6)
+    software_hash = get_software_hash(software_info)
     return f"{pixi_env_name}-{threadpool_hash}-{software_hash}"
+
+
+def add_env_hashes_to_cases(
+    entries: List[Dict], hardware_hash: str, software_hash: str
+) -> None:
+    for entry in entries:
+        case = entry.get("case")
+        if case is None:
+            continue
+        case["hardware_hash"] = hardware_hash
+        case["software_hash"] = software_hash
 
 
 def call_benchmarks(
@@ -207,6 +222,8 @@ def run_benchmarks(args: argparse.Namespace) -> int:
     logger.setLevel(args.runner_log_level)
 
     env_info = get_environment_info()
+    hardware_hash = get_hardware_hash(env_info["hardware"])
+    software_hash = get_software_hash(env_info["software"])
     hardware_env_name = get_hardware_env_name(env_info["hardware"])
     software_env_name = get_software_env_name(env_info["software"])
     result_file_prefix = get_result_file_prefix(args)
@@ -240,6 +257,8 @@ def run_benchmarks(args: argparse.Namespace) -> int:
         args.bench_log_level,
         args.exit_on_error,
     )
+    add_env_hashes_to_cases(result, hardware_hash, software_hash)
+    add_env_hashes_to_cases(failed_cases, hardware_hash, software_hash)
 
     # output raw result
     logger.debug(custom_format(result))
