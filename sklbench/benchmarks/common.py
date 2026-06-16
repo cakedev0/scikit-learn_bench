@@ -65,6 +65,13 @@ def enrich_result(result: Dict, bench_case: BenchCase) -> Dict:
     return result
 
 
+def time_and_metrics(result: Dict) -> tuple:
+    return (
+        result.get("time[ms]"),
+        {key: value for key, value in result.items() if key != "time[ms]"},
+    )
+
+
 def check_to_print_result(bench_case: BenchCase) -> bool:
     """Check if the benchmark should print the result"""
     distribution = get_bench_case_value(bench_case, "bench:distributor")

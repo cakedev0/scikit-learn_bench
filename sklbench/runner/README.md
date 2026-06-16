@@ -66,7 +66,7 @@ metadata SHA-256 hash, optionally prefixed by a short name from
 `hardware-names.json` in the current working directory. Software metadata
 filenames include the Pixi environment name, the first three characters of the
 `threadpool_info` SHA-256 hash, and the first six characters of the full
-software metadata SHA-256 hash. Timestamped results files contain
-`{"bench_cases": [...]}`.
+software metadata SHA-256 hash. Timestamped results files contain top-level
+`hardware_hash`, `software_hash`, `bench_cases`, and `failed_cases` keys.
 ---
 [Documentation tree](../../README.md#-documentation)

@@ -119,17 +119,6 @@ def get_software_env_name(software_info: Dict) -> str:
     return f"{pixi_env_name}-{threadpool_hash}-{software_hash}"
 
 
-def add_env_hashes_to_cases(
-    entries: List[Dict], hardware_hash: str, software_hash: str
-) -> None:
-    for entry in entries:
-        case = entry.get("case")
-        if case is None:
-            continue
-        case["hardware_hash"] = hardware_hash
-        case["software_hash"] = software_hash
-
-
 def call_benchmarks(
     bench_cases: List[BenchCase],
     filters: List[BenchCase],
@@ -182,6 +171,8 @@ def save_results(
     failed_cases: List[Dict],
     hardware_env_name: str,
     software_env_name: str,
+    hardware_hash: str,
+    software_hash: str,
     env_info: Dict,
     results_dir: str,
     result_file_prefix: str,
@@ -205,7 +196,12 @@ def save_results(
         except FileExistsError:
             pass
 
-    result = {"bench_cases": bench_cases, "failed_cases": failed_cases}
+    result = {
+        "hardware_hash": hardware_hash,
+        "software_hash": software_hash,
+        "bench_cases": bench_cases,
+        "failed_cases": failed_cases,
+    }
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     result_file = bench_results_dir / f"{result_file_prefix}_{timestamp}.json"
     with open(result_file, "x") as fp:
@@ -257,9 +253,6 @@ def run_benchmarks(args: argparse.Namespace) -> int:
         args.bench_log_level,
         args.exit_on_error,
     )
-    add_env_hashes_to_cases(result, hardware_hash, software_hash)
-    add_env_hashes_to_cases(failed_cases, hardware_hash, software_hash)
-
     # output raw result
     logger.debug(custom_format(result))
 
@@ -269,6 +262,8 @@ def run_benchmarks(args: argparse.Namespace) -> int:
         failed_cases,
         hardware_env_name,
         software_env_name,
+        hardware_hash,
+        software_hash,
         env_info,
         args.results_dir,
         result_file_prefix,

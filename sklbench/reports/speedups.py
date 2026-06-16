@@ -132,8 +132,7 @@ def flatten_records(result_files: List[ResultFile]) -> List[Record]:
             variant = implementation_variant(implementation)
             name = case_name(case)
             key = match_key(case, result_file.environment)
-            for method, result in bench_case.get("results", {}).items():
-                times = result.get("time[ms]")
+            for method, times in bench_case.get("time[ms]", {}).items():
                 if not isinstance(times, list) or len(times) == 0:
                     continue
                 records.append(
@@ -349,10 +348,7 @@ def point_hover(point: Point) -> str:
 
 
 def data_params_for_display(case: Dict[str, Any]) -> Dict[str, Any]:
-    return without_keys(
-        case.get("data", {}),
-        excluded_names={"training", "inference"},
-    )
+    return case.get("data", {})
 
 
 def csv_output_path(html_output: Path, requested_csv_output: Path | None) -> Path:
@@ -367,7 +363,6 @@ def csv_rows(points: List[Point], base_variant: str) -> List[Dict[str, Any]]:
         points,
         key=lambda point: (point.method, point.name, point.target_variant),
     ):
-        algorithm = point.case.get("algorithm", {})
         implementation = point.case.get("implementation", {})
         data = data_params_for_display(point.case)
         rows.append(
@@ -385,13 +380,12 @@ def csv_rows(points: List[Point], base_variant: str) -> List[Dict[str, Any]]:
                 "target_timestamp": point.target_timestamp.isoformat(),
                 "base_result_file": str(point.base_result_file),
                 "target_result_file": str(point.target_result_file),
-                "algorithm_task": algorithm.get("task"),
                 "target_library": implementation.get("library"),
                 "target_device": implementation.get("device"),
                 "data_source": data.get("source"),
                 "data_format": implementation.get("data_library"),
                 "estimator_params": compact_json(
-                    algorithm.get("estimator_params", {})
+                    point.case.get("algorithm", {}).get("estimator_params", {})
                 ),
                 "data_params": compact_json(data),
                 "generation_kwargs": compact_json(
@@ -419,7 +413,6 @@ def write_csv_report(points: List[Point], base_variant: str, path: Path) -> None
         "target_timestamp",
         "base_result_file",
         "target_result_file",
-        "algorithm_task",
         "target_library",
         "target_device",
         "data_source",

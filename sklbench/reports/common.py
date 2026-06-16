@@ -32,6 +32,8 @@ class ResultFile:
     env_name: str
     timestamp: datetime
     environment: Dict[str, Any]
+    hardware_hash: str
+    software_hash: str
     bench_cases: List[Dict[str, Any]]
 
 
@@ -85,6 +87,8 @@ def load_result_file(path: Path) -> ResultFile:
         env_name=env_name,
         timestamp=parse_result_timestamp(path),
         environment=environment,
+        hardware_hash=result["hardware_hash"],
+        software_hash=result["software_hash"],
         bench_cases=result["bench_cases"],
     )
 

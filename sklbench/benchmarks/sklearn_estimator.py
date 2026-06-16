@@ -48,7 +48,7 @@ from ..utils.custom_types import BenchCase, Numeric, NumpyNumeric
 from ..utils.logger import logger
 from ..utils.measurement import measure_case
 from ..utils.special_params import assign_case_special_values_on_run
-from .common import main_template
+from .common import main_template, time_and_metrics
 
 
 def get_estimator(library_name: str, estimator_name: str):
@@ -604,7 +604,6 @@ def main(bench_case: BenchCase, filters: List[BenchCase]):
         )
 
     case = deepcopy(bench_case)
-    case.setdefault("algorithm", {})["task"] = task
     if hasattr(estimator_instance, "get_params"):
         estimator_params = estimator_instance.get_params()
     # note: "handle" is not JSON-serializable
@@ -612,12 +611,13 @@ def main(bench_case: BenchCase, filters: List[BenchCase]):
         del estimator_params["handle"]
     logger.debug(f"Estimator parameters:\n{custom_format(estimator_params)}")
 
-    data_descs = {
-        "training": data_description["x_train"],
-        "inference": data_description["x_test"],
+    data_desc = {
+        "fit": data_description["x_train"],
+        "predict": data_description["x_test"],
     }
     for stage in estimator_methods.keys():
-        data_descs[stage].update(
+        output_stage = "fit" if stage == "training" else "predict"
+        data_desc[output_stage].update(
             {
                 "batch_size": get_bench_case_value(
                     bench_case, f"algorithm:batch_size:{stage}"
@@ -625,17 +625,25 @@ def main(bench_case: BenchCase, filters: List[BenchCase]):
             }
         )
         if "n_classes" in data_description:
-            data_descs[stage].update({"n_classes": data_description["n_classes"]})
+            data_desc[output_stage].update({"n_classes": data_description["n_classes"]})
 
-    case.setdefault("data", {}).update(data_descs)
-
-    results = dict()
+    times = dict()
+    result_metrics = dict()
     for method in metrics.keys():
         for stage in estimator_methods.keys():
             if method in estimator_methods[stage]:
-                results[method] = metrics[method]
+                times[method], result_metrics[method] = time_and_metrics(
+                    metrics[method]
+                )
 
-    return [{"case": case, "results": results}]
+    return [
+        {
+            "case": case,
+            "data_desc": data_desc,
+            "time[ms]": times,
+            "metrics": result_metrics,
+        }
+    ]
 
 
 if __name__ == "__main__":

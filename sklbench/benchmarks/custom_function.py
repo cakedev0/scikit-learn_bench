@@ -26,7 +26,7 @@ from ..utils.custom_types import BenchCase
 from ..utils.logger import logger
 from ..utils.measurement import measure_case
 from ..utils.special_params import assign_case_special_values_on_run
-from .common import main_template
+from .common import main_template, time_and_metrics
 
 
 def get_function_instance(library_name: str, function_name: str):
@@ -94,12 +94,18 @@ def main(bench_case: BenchCase, filters: List[BenchCase]):
     )
 
     case = deepcopy(bench_case)
-    case.setdefault("algorithm", {})["task"] = "utility"
-    # TODO: replace `x_train` data_desc with more informative values
-    case.setdefault("data", {}).update(data_description["x_train"])
+    data_desc = data_description["x_train"]
     if "n_classes" in data_description:
-        case["data"]["n_classes"] = data_description["n_classes"]
-    return [{"case": case, "results": {function_name: metrics}}]
+        data_desc["n_classes"] = data_description["n_classes"]
+    times, result_metrics = time_and_metrics(metrics)
+    return [
+        {
+            "case": case,
+            "data_desc": data_desc,
+            "time[ms]": {function_name: times},
+            "metrics": {function_name: result_metrics},
+        }
+    ]
 
 
 if __name__ == "__main__":
