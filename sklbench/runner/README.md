@@ -52,12 +52,15 @@ Results are written under `results/` by default:
 
 ```text
 results/
+  hardware-envs/
+    <hardware_hash>.json
+  software-envs/
+    <software_hash>.json
   <YYYYMMDDTHHMMSSffffffZ>.json
 ```
 
-Result files contain top-level `hardware_hash`, `software_hash`, `environment`,
-`bench_cases`, and `failed_cases` keys. The `environment` field embeds the
-captured hardware and software metadata. Hardware and software environment names
-are their hashes.
+Result files contain top-level `hardware_hash`, `software_hash`, `bench_cases`,
+and `failed_cases` keys. Hardware and software environment filenames are their
+hashes.
 ---
 [Documentation tree](../../README.md#-documentation)

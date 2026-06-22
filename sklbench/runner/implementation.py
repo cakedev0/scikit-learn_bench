@@ -47,14 +47,6 @@ def get_software_hash(software_info: Dict) -> str:
     return hash_from_json_repr(software_info, hash_limit=6)
 
 
-def get_hardware_env_name(hardware_info: Dict) -> str:
-    return get_hardware_hash(hardware_info)
-
-
-def get_software_env_name(software_info: Dict) -> str:
-    return get_software_hash(software_info)
-
-
 def call_benchmarks(
     bench_cases: List[BenchCase],
     filters: List[BenchCase],
@@ -111,12 +103,25 @@ def save_results(
     results_dir: str,
 ):
     results_root = Path(results_dir)
-    results_root.mkdir(parents=True, exist_ok=True)
+    hardware_env_dir = results_root / "hardware-envs"
+    software_env_dir = results_root / "software-envs"
+    hardware_env_dir.mkdir(parents=True, exist_ok=True)
+    software_env_dir.mkdir(parents=True, exist_ok=True)
+
+    env_files = [
+        (hardware_env_dir / f"{hardware_hash}.json", env_info["hardware"]),
+        (software_env_dir / f"{software_hash}.json", env_info["software"]),
+    ]
+    for env_file, env_content in env_files:
+        try:
+            with open(env_file, "x") as fp:
+                json.dump(env_content, fp, indent=4)
+        except FileExistsError:
+            pass
 
     result = {
         "hardware_hash": hardware_hash,
         "software_hash": software_hash,
-        "environment": env_info,
         "bench_cases": bench_cases,
         "failed_cases": failed_cases,
     }
