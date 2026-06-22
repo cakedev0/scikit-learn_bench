@@ -254,6 +254,7 @@ def get_hardware_info() -> Dict:
     # CPU
     try:
         from cpuinfo import get_cpu_info
+        import joblib
 
         cpu_info = get_cpu_info()
         # remap cpu info values to better understandable names
@@ -269,6 +270,7 @@ def get_hardware_info() -> Dict:
                 cpu_info[fields_map[key]] = value
         # squash CPU flags
         cpu_info["flags"] = " ".join(cpu_info["flags"])
+        cpu_info["physical_cores"] = joblib.cpu_count(only_physical_cores=True)
         result["CPU"] = cpu_info
         logger.info(f'CPU name: {cpu_info["name"]}')
         logger.info(
