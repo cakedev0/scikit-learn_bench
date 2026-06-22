@@ -17,8 +17,6 @@
 
 import argparse
 import json
-import os
-import re
 from datetime import datetime, timezone
 from multiprocessing import Pool
 from pathlib import Path
@@ -32,7 +30,6 @@ from ..utils.bench_case import get_bench_case_name, get_data_name
 from ..utils.common import custom_format, hash_from_json_repr
 from ..utils.config import (
     early_filtering,
-    find_configs,
     generate_bench_cases,
     generate_bench_filters,
 )
@@ -40,54 +37,6 @@ from ..utils.custom_types import BenchCase
 from ..utils.env import get_environment_info
 from ..utils.logger import logger
 from .commands_helper import run_benchmark_from_case
-
-
-def _sanitize_filename_part(value: str) -> str:
-    value = re.sub(r"[^A-Za-z0-9_.-]+", "-", value.strip())
-    return value.strip(".-") or "unknown"
-
-
-def _models_template_from_config(config_file: str) -> str | None:
-    try:
-        with open(config_file, "r") as fp:
-            config_content = json.load(fp)
-    except (OSError, json.JSONDecodeError):
-        return None
-
-    for include_config in config_content.get("INCLUDE", []):
-        match = re.search(r"\[SKBENCH_MODELS_TEMPLATE=([^\]]*)\]", include_config)
-        if match:
-            return match.group(1)
-    return None
-
-
-def get_result_file_prefix(args: argparse.Namespace) -> str:
-    config_files = find_configs(args.config)
-    if config_files:
-        config_names = [
-            _sanitize_filename_part(Path(config_file).stem)
-            for config_file in config_files
-        ]
-        prefix = "+".join(config_names)
-    else:
-        prefix = "results"
-
-    models_template = os.environ.get("SKBENCH_MODELS_TEMPLATE")
-    if models_template is None:
-        models_templates = {
-            template
-            for config_file in config_files
-            if (template := _models_template_from_config(config_file)) is not None
-        }
-        if len(models_templates) == 1:
-            models_template = next(iter(models_templates))
-    if models_template:
-        prefix = f"{prefix}-{_sanitize_filename_part(models_template)}"
-    return prefix
-
-
-def get_pixi_env_name(software_info: Dict) -> str:
-    return _sanitize_filename_part(software_info["pixi_environment_name"])
 
 
 def get_hardware_hash(hardware_info: Dict) -> str:
@@ -99,24 +48,11 @@ def get_software_hash(software_info: Dict) -> str:
 
 
 def get_hardware_env_name(hardware_info: Dict) -> str:
-    hardware_hash = get_hardware_hash(hardware_info)
-    hardware_names_file = Path("hardware-names.json")
-    if hardware_names_file.is_file():
-        with open(hardware_names_file, "r") as fp:
-            hardware_names = json.load(fp)
-        hardware_name = hardware_names.get(hardware_hash)
-        if hardware_name:
-            return f"{_sanitize_filename_part(str(hardware_name))}-{hardware_hash}"
-    return hardware_hash
+    return get_hardware_hash(hardware_info)
 
 
 def get_software_env_name(software_info: Dict) -> str:
-    pixi_env_name = get_pixi_env_name(software_info)
-    threadpool_hash = hash_from_json_repr(
-        software_info.get("threadpool_info", []), hash_limit=3
-    )
-    software_hash = get_software_hash(software_info)
-    return f"{pixi_env_name}-{threadpool_hash}-{software_hash}"
+    return get_software_hash(software_info)
 
 
 def call_benchmarks(
@@ -169,41 +105,23 @@ def call_benchmarks(
 def save_results(
     bench_cases: List[Dict],
     failed_cases: List[Dict],
-    hardware_env_name: str,
-    software_env_name: str,
     hardware_hash: str,
     software_hash: str,
     env_info: Dict,
     results_dir: str,
-    result_file_prefix: str,
 ):
     results_root = Path(results_dir)
-    hardware_env_dir = results_root / "hardware-envs"
-    software_env_dir = results_root / "software-envs"
-    bench_results_dir = results_root / hardware_env_name / software_env_name
-    hardware_env_dir.mkdir(parents=True, exist_ok=True)
-    software_env_dir.mkdir(parents=True, exist_ok=True)
-    bench_results_dir.mkdir(parents=True, exist_ok=True)
-
-    env_files = [
-        (hardware_env_dir / f"{hardware_env_name}.json", env_info["hardware"]),
-        (software_env_dir / f"{software_env_name}.json", env_info["software"]),
-    ]
-    for env_file, env_content in env_files:
-        try:
-            with open(env_file, "x") as fp:
-                json.dump(env_content, fp, indent=4)
-        except FileExistsError:
-            pass
+    results_root.mkdir(parents=True, exist_ok=True)
 
     result = {
         "hardware_hash": hardware_hash,
         "software_hash": software_hash,
+        "environment": env_info,
         "bench_cases": bench_cases,
         "failed_cases": failed_cases,
     }
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    result_file = bench_results_dir / f"{result_file_prefix}_{timestamp}.json"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    result_file = results_root / f"{timestamp}.json"
     with open(result_file, "x") as fp:
         json.dump(result, fp, indent=4)
     logger.warning(f"Benchmark results saved to {result_file}")
@@ -220,9 +138,6 @@ def run_benchmarks(args: argparse.Namespace) -> int:
     env_info = get_environment_info()
     hardware_hash = get_hardware_hash(env_info["hardware"])
     software_hash = get_software_hash(env_info["software"])
-    hardware_env_name = get_hardware_env_name(env_info["hardware"])
-    software_env_name = get_software_env_name(env_info["software"])
-    result_file_prefix = get_result_file_prefix(args)
 
     # find and parse configs
     bench_cases = generate_bench_cases(args)
@@ -260,13 +175,10 @@ def run_benchmarks(args: argparse.Namespace) -> int:
     save_results(
         result,
         failed_cases,
-        hardware_env_name,
-        software_env_name,
         hardware_hash,
         software_hash,
         env_info,
         args.results_dir,
-        result_file_prefix,
     )
 
     return return_code

@@ -44,7 +44,7 @@ def parse_result_timestamp(path: Path) -> datetime:
             f"Result filename '{path}' does not end with _<datetime>.json"
         )
     timestamp = match.group(1)
-    date_format = "%Y%m%dT%H%M%S%fZ" if len(timestamp) == 22 else "%Y%m%dT%H%M%SZ"
+    date_format = "%Y%m%dT%H%M%S%fZ" if len(timestamp) > 16 else "%Y%m%dT%H%M%SZ"
     return datetime.strptime(timestamp, date_format).replace(tzinfo=timezone.utc)
 
 
@@ -52,22 +52,41 @@ def load_result_file(path: Path) -> ResultFile:
     if not path.is_file():
         raise FileNotFoundError(f"Result input must be a file: {path}")
 
+    with open(path, "r") as fp:
+        result = json.load(fp)
+
+    if "bench_cases" not in result:
+        raise ValueError(f"Result file '{path}' does not contain 'bench_cases'")
+
+    if "environment" in result:
+        environment = result["environment"]
+        env_name = f"{result['hardware_hash']}/{result['software_hash']}"
+        return ResultFile(
+            path=path,
+            env_name=env_name,
+            timestamp=parse_result_timestamp(path),
+            environment=environment,
+            hardware_hash=result["hardware_hash"],
+            software_hash=result["software_hash"],
+            bench_cases=result["bench_cases"],
+        )
+
     env_root = path.parent.parent.parent
     hardware_env_name = path.parent.parent.name
     software_env_name = path.parent.name
     hardware_env_file = env_root / "hardware-envs" / f"{hardware_env_name}.json"
     software_env_file = env_root / "software-envs" / f"{software_env_name}.json"
-
     if hardware_env_file.is_file() and software_env_file.is_file():
-        env_name = f"{hardware_env_name}/{software_env_name}"
+        env_name = f"{result['hardware_hash']}/{result['software_hash']}"
         with open(hardware_env_file, "r") as fp:
             hardware = json.load(fp)
         with open(software_env_file, "r") as fp:
             software = json.load(fp)
         environment = {"hardware": hardware, "software": software}
     else:
-        env_name = path.parent.name
-        env_file = path.parent.parent / "envs" / f"{env_name}.json"
+        env_name = f"{result['hardware_hash']}/{result['software_hash']}"
+        legacy_env_name = path.parent.name
+        env_file = path.parent.parent / "envs" / f"{legacy_env_name}.json"
         if not env_file.is_file():
             raise FileNotFoundError(
                 f"Unable to find environment files for '{path}': expected either "
@@ -75,12 +94,6 @@ def load_result_file(path: Path) -> ResultFile:
             )
         with open(env_file, "r") as fp:
             environment = json.load(fp)
-
-    with open(path, "r") as fp:
-        result = json.load(fp)
-
-    if "bench_cases" not in result:
-        raise ValueError(f"Result file '{path}' does not contain 'bench_cases'")
 
     return ResultFile(
         path=path,

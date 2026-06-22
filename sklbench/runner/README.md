@@ -52,21 +52,12 @@ Results are written under `results/` by default:
 
 ```text
 results/
-  hardware-envs/
-    [<hardware_name>-]<hardware_hash>.json
-  software-envs/
-    <pixi_env>-<threadpool_info_hash>-<software_hash>.json
-  [<hardware_name>-]<hardware_hash>/
-    <pixi_env>-<threadpool_info_hash>-<software_hash>/
-    <config_name>[-<SKBENCH_MODELS_TEMPLATE>]_<YYYYMMDDTHHMMSSZ>.json
+  <YYYYMMDDTHHMMSSffffffZ>.json
 ```
 
-Hardware metadata filenames are the first six characters of the hardware
-metadata SHA-256 hash, optionally prefixed by a short name from
-`hardware-names.json` in the current working directory. Software metadata
-filenames include the Pixi environment name, the first three characters of the
-`threadpool_info` SHA-256 hash, and the first six characters of the full
-software metadata SHA-256 hash. Timestamped results files contain top-level
-`hardware_hash`, `software_hash`, `bench_cases`, and `failed_cases` keys.
+Result files contain top-level `hardware_hash`, `software_hash`, `environment`,
+`bench_cases`, and `failed_cases` keys. The `environment` field embeds the
+captured hardware and software metadata. Hardware and software environment names
+are their hashes.
 ---
 [Documentation tree](../../README.md#-documentation)

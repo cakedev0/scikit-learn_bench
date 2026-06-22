@@ -191,6 +191,12 @@ def hardware_key(result_file: ResultFile) -> str:
     return stable_json(result_file.environment.get("hardware", {}))
 
 
+def result_root(path):
+    if path.parent.name == "results":
+        return path.parent
+    return path.parent.parent.parent
+
+
 def discover_result_files(base_result_files: List[ResultFile]) -> List[ResultFile]:
     base_hardware_keys = {hardware_key(result_file) for result_file in base_result_files}
     if len(base_hardware_keys) != 1:
@@ -199,7 +205,7 @@ def discover_result_files(base_result_files: List[ResultFile]) -> List[ResultFil
 
     result_files = []
     seen_paths = set()
-    roots = sorted({result_file.path.parent.parent for result_file in base_result_files})
+    roots = sorted({result_root(result_file.path) for result_file in base_result_files})
     for root in roots:
         for path in sorted(root.rglob("*.json")):
             if (
