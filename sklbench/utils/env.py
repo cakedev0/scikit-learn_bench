@@ -206,16 +206,6 @@ def get_nvidia_devices() -> pd.DataFrame:
         if memory_info is not None:
             device_info["memory size[GB]"] = round(memory_info.total / 2**30)
 
-        uuid = get_nvml_value(pynvml.nvmlDeviceGetUUID, handle)
-        if uuid is not None:
-            device_info["uuid"] = uuid
-
-        pci_info = get_nvml_value(pynvml.nvmlDeviceGetPciInfo, handle)
-        if pci_info is not None:
-            bus_id = decode_nvml_value(getattr(pci_info, "busId", None))
-            if bus_id is not None:
-                device_info["pci bus id"] = bus_id
-
         if hasattr(pynvml, "nvmlDeviceGetCudaComputeCapability"):
             compute_capability = get_nvml_value(
                 pynvml.nvmlDeviceGetCudaComputeCapability, handle
