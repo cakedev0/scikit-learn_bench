@@ -16,13 +16,9 @@
 
 import sys
 
+from sklbench.config import load_cases_from_script
 from sklbench.orchestrator import get_orchestrator_parser, get_parser_description
 from sklbench.orchestrator import orchestrate_benchmarks
-from sklbench.parser import (
-    early_filtering,
-    generate_bench_cases,
-    generate_bench_filters,
-)
 
 
 def main():
@@ -32,10 +28,11 @@ def main():
         print(get_parser_description(parser))
         return 0
 
-    bench_cases = generate_bench_cases(args)
-    param_filters = generate_bench_filters(args.parameter_filters)
-    bench_cases = early_filtering(bench_cases, param_filters)
-    return orchestrate_benchmarks(bench_cases, param_filters, args)
+    if args.config is None:
+        parser.error("--config is required unless --describe-parser is used")
+
+    bench_cases = load_cases_from_script(args.config)
+    return orchestrate_benchmarks(bench_cases, [], args)
 
 
 if __name__ == "__main__":

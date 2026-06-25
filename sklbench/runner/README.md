@@ -4,10 +4,11 @@
 
 It is intentionally separate from config parsing and orchestration:
 
-- the parser generates resolved benchmark cases;
+- a Python config script generates validated benchmark cases;
 - the orchestrator records environments, launches runner subprocesses, captures
   logs/errors, and writes result files;
-- the runner loads data for one case, runs repetitions, and writes JSONL.
+- the runner validates one case file, loads data, runs repetitions, and writes
+  JSONL.
 
 ## CLI Contract
 

@@ -15,6 +15,7 @@ from ..benchmarks.sklearn_estimator import (
     get_subset_metrics_of_estimator,
     validate_estimator_params,
 )
+from ..config import validate_case
 from ..datasets import load_data
 from ..datasets.transformer import split_and_transform_data
 from ..utils.bench_case import get_bench_case_value
@@ -300,6 +301,6 @@ def main() -> int:
     args = parse_args()
     logger.setLevel(args.log_level)
     with args.case_file.open("r", encoding="utf-8") as fp:
-        bench_case = json.load(fp)
+        bench_case = validate_case(json.load(fp))
     run_case_to_jsonl(bench_case, args.output_jsonl)
     return 0

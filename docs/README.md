@@ -4,7 +4,7 @@ This document covers topics useful for contributors to Scikit-learn_bench:
 
 - [Developer Guide](#developer-guide)
   - [High-level workflow of Scikit-learn\_bench](#high-level-workflow-of-scikit-learn_bench)
-  - [Configs parser workflow](#configs-parser-workflow)
+  - [Python config workflow](#python-config-workflow)
 
 ## High-Level Workflow of Scikit-learn_bench
 
@@ -16,10 +16,9 @@ stateDiagram-v2
     BenchmarksRunner --> raw_results[JSON]:::inputOutput
 
     state BenchmarksRunner {
-        ArgumentParser --> ConfigParser: config_arguments
+        ArgumentParser --> ConfigLoader: config_script
         ArgumentParser --> Benchmarks: other_arguments
-        ConfigParser --> Benchmarks: benchmark_cases\n[JSON-formatted string]
-        ConfigParser --> Benchmarks: benchmark_filters\n[JSON-formatted string]
+        ConfigLoader --> Benchmarks: validated benchmark_cases
 
         state Benchmarks {
             SklearnLikeEstimator --> raw_results[JSON]
@@ -32,35 +31,26 @@ stateDiagram-v2
 Scikit-learn_bench consists of three main parts:
  - **Benchmarks runner**:
      1. Consumes user-provided high-level arguments (argument parser).
-     2. Transforms arguments to benchmark cases as parameters for individual benchmarks (config parser).
+     2. Loads a Python config script and validates generated benchmark cases.
      3. Combines the raw outputs.
  - **Individual benchmarks** wrapping specific entities or workloads (sklearn-like estimators, custom functions, etc.)
 
 Runner is responsible for orchestration of benchmarking cases, individual benchmarks - for actual run of each case.
 
-## Configs parser workflow
+## Python config workflow
 
-Benchmarking configuration exists as two stages:
-1. **Benchmarking template** where parameters or group of them might be defined as a *range of values*
-2. **Benchmarking case** with deducted *scalar values* of parameters
+Benchmark configuration is ordinary Python. A config script exposes a
+`generate_cases()` function returning a list of case dictionaries.
 
-In other words, the template has the `Dict[str, AnyJSONSerializable]` type, while the case has `Dict[str, Dict[str, ... [str, Scalar] ... ]]`.
+Config loading steps:
 
-Configs parser steps:
-1. Find all config files from the user-provided `config` argument or use globally defined `parameters` as a standalone config
-2. Convert configs to templates
-3. Expand template-special values and ranges to all possible cases
-4. Remove duplicated cases and assign case-special values if possible
+1. Import the script passed to `--config`.
+2. Call `generate_cases()`.
+3. Validate every returned dict with `sklbench.config.validate_case`.
+4. Pass normalized JSON-serializable cases to the runner.
 
-Special values might be assigned on three stages:
- - During template reading in runner
- - During benchmarking cases generation in runner
- - During run of individual benchmark
-
-Benchmark parameters the following overwriting priority:
-1. CLI parameters
-2. Config template parameters
-3. Parameters set
+Computed values, combinations, imports, and filtering should be expressed
+directly in Python inside the config script.
 
 ---
 [Documentation tree](../README.md#-documentation)

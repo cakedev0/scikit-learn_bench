@@ -14,23 +14,19 @@
 # limitations under the License.
 # ===============================================================================
 
-from copy import deepcopy
-from math import ceil
-from typing import Dict, List
+from typing import Dict
 
 import numpy as np
 import pandas as pd
 from psutil import cpu_count
 from sklearn.metrics import euclidean_distances
 
-from ..datasets import dataset_loading_functions
 from .bench_case import (
     get_bench_case_value,
     set_bench_case_value,
 )
-from .common import convert_to_numpy, flatten_list
-from .custom_types import BenchCase, BenchTemplate
-from .env import get_numa_cpus_conf
+from .common import convert_to_numpy
+from .custom_types import BenchCase
 from .logger import logger
 
 SP_VALUE_STR = "[SPECIAL_VALUE]"
@@ -38,139 +34,6 @@ SP_VALUE_STR = "[SPECIAL_VALUE]"
 
 def is_special_value(value) -> bool:
     return isinstance(value, str) and value.startswith(SP_VALUE_STR)
-
-
-def explain_range(range_str: str) -> List:
-    def check_range_values_size(range_values: List[int], size: int):
-        if len(range_values) != size:
-            raise ValueError(
-                f"Range contains {len(range_values)} " f"numeric values instead of {size}"
-            )
-
-    range_values = range_str.replace("[RANGE]", "").split(":")
-    # TODO: add float values
-    range_type = range_values[0]
-    range_values = list(map(int, range_values[1:]))
-    # - add:start{int}:end{int}:step{int} - Arithmetic progression
-    #   Sequence: start + step * i <= end
-    if range_type == "add":
-        check_range_values_size(range_values, 3)
-        start, end, step = range_values
-        return list(range(start, end + step, step))
-    # - mul:current{int}:end{int}:step{int} - Geometric progression
-    #   Sequence: current * step <= end
-    elif range_type == "mul":
-        check_range_values_size(range_values, 3)
-        current, end, step = range_values
-        result = list()
-        while current <= end:
-            result.append(current)
-            current *= step
-        return result
-    # - pow:base{int}:start{int}:end{int}[:step{int}] - Powers of base number
-    elif range_type == "pow":
-        # add default step = 1 if not defined
-        if len(range_values) < 4:
-            range_values.append(1)
-        check_range_values_size(range_values, 4)
-        base, start, end, step = range_values
-        return [base**i for i in range(start, end + step, step)]
-    else:
-        raise ValueError(f'Unknown "{range_type}" range type')
-
-
-def assign_template_special_values(template: BenchTemplate) -> BenchTemplate:
-    # data:dataset special values
-    datasets = deepcopy(get_bench_case_value(template, "data:dataset"))
-    if datasets is not None:
-        if not isinstance(datasets, list):
-            datasets = [datasets]
-        # `all_named` is equal to all datasets known by data loaders
-        all_named_datasets = list(dataset_loading_functions.keys())
-        for i, dataset in enumerate(datasets):
-            if is_special_value(dataset):
-                dataset = dataset.replace(SP_VALUE_STR, "")
-                if dataset == "all_named":
-                    datasets[i] = all_named_datasets
-        datasets = flatten_list(datasets, ensure_type_homogeneity=True)
-        set_bench_case_value(template, "data:dataset", datasets)
-
-    return template
-
-
-def assign_case_special_values_on_generation(bench_case: BenchCase) -> BenchCase:
-    # estimator max_bins as the generated dataset sample count
-    max_bins = get_bench_case_value(
-        bench_case, "algorithm:estimator_params:max_bins"
-    )
-    if is_special_value(max_bins):
-        max_bins = max_bins.replace(SP_VALUE_STR, "")
-        if max_bins != "n_samples":
-            raise ValueError(f'Unknown special value "{max_bins}" for max_bins')
-        n_samples = get_bench_case_value(
-            bench_case, "data:generation_kwargs:n_samples"
-        )
-        if n_samples is None:
-            raise ValueError(
-                '"n_samples" is not specified for special value of "max_bins"'
-            )
-        set_bench_case_value(
-            bench_case, "algorithm:estimator_params:max_bins", n_samples
-        )
-
-    # sklearn.datasets.make_classification: n_informative as ratio of n_features
-    n_informative = get_bench_case_value(
-        bench_case, "data:generation_kwargs:n_informative"
-    )
-    if is_special_value(n_informative):
-        n_informative = float(n_informative.replace(SP_VALUE_STR, ""))
-        if n_informative <= 0.0 or n_informative > 1.0:
-            raise ValueError(f'Wrong special value "{n_informative}" for n_informative')
-        n_features = get_bench_case_value(bench_case, "data:generation_kwargs:n_features")
-        if n_features is None:
-            raise ValueError(
-                '"n_features" is not specified for special value of "n_informative"'
-            )
-        set_bench_case_value(
-            bench_case,
-            "data:generation_kwargs:n_informative",
-            ceil(n_informative * n_features),
-        )
-    # taskset
-    taskset = get_bench_case_value(bench_case, "bench:taskset")
-    if is_special_value(taskset):
-        taskset = taskset.replace(SP_VALUE_STR, "")
-        # special value format for numa nodes: "numa:{numa_node_0}[|{numa_node_1}...]"
-        if taskset.startswith("numa"):
-            numa_nodes = list(map(int, taskset.split(":")[1].split("|")))
-            numa_cpus_conf = get_numa_cpus_conf()
-            taskset = ",".join([numa_cpus_conf[numa_node] for numa_node in numa_nodes])
-            set_bench_case_value(bench_case, "bench:taskset", taskset)
-
-    # estimator n_jobs as a physical/logical CPU count or a ratio of it
-    n_jobs = get_bench_case_value(bench_case, "algorithm:estimator_params:n_jobs", None)
-    if is_special_value(n_jobs):
-        n_jobs = n_jobs.replace(SP_VALUE_STR, "")
-        if n_jobs.startswith("physical_cpus"):
-            n_cpus = cpu_count(logical=False)
-        elif n_jobs.startswith("logical_cpus"):
-            n_cpus = cpu_count(logical=True)
-        else:
-            raise ValueError(f'Unknown special value {n_jobs} for "n_jobs"')
-        n_jobs = int(n_cpus * get_ratio_from_n_jobs(n_jobs))
-        set_bench_case_value(bench_case, "algorithm:estimator_params:n_jobs", n_jobs)
-
-    # remove requested parameters from the case
-    def traverse_with_removal(case: BenchCase):
-        for key, value in list(case.items()):
-            if isinstance(value, dict):
-                traverse_with_removal(value)
-            elif isinstance(value, str) and value == "[REMOVE]":
-                del case[key]
-
-    traverse_with_removal(bench_case)
-
-    return bench_case
 
 
 def get_ratio_from_n_jobs(n_jobs: str) -> float:

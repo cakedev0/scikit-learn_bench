@@ -24,7 +24,8 @@ Benchmark workflow:
  - Measure required estimator methods
  - Combine metrics and parameters into the output
 
-See [benchmark-specific config parameters](../../configs/README.md#benchmark-specific-parameters).
+See the accepted config fields in the
+[Pydantic case models](../config/models.py).
 
 ## `Function`
 
@@ -35,7 +36,8 @@ Benchmark workflow:
  - Assign special values that require estimator/data to be loaded
  - Measure function performance metrics
 
-See [benchmark-specific config parameters](../../configs/README.md#benchmark-specific-parameters).
+See the accepted config fields in the
+[Pydantic case models](../config/models.py).
 
 ---
 [Documentation tree](../../README.md#-documentation)

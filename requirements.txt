@@ -11,3 +11,4 @@ tqdm
 psutil
 requests
 py-cpuinfo
+pydantic

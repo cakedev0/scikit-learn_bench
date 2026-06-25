@@ -60,39 +60,10 @@ def add_orchestrator_arguments(
     )
     parser.add_argument(
         "--config",
-        "--configs",
         "-c",
         type=str,
-        nargs="+",
         default=None,
-        help="Paths to configuration files or directories with configuration files.",
-    )
-    parser.add_argument(
-        "--parameters",
-        "--params",
-        "-p",
-        default="",
-        type=str,
-        nargs="+",
-        help="Globally defines or overwrites config parameters.",
-    )
-    parser.add_argument(
-        "--templates",
-        "--template",
-        "-t",
-        default=None,
-        type=str,
-        nargs="+",
-        help="Filters config templates by name before benchmark cases are generated.",
-    )
-    parser.add_argument(
-        "--parameter-filters",
-        "--filters",
-        "-f",
-        default="",
-        type=str,
-        nargs="+",
-        help="Filters benchmarking cases by parameter values.",
+        help="Path to a Python config script.",
     )
     parser.add_argument(
         "--results-dir",
