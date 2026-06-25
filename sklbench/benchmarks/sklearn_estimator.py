@@ -43,7 +43,7 @@ from ..datasets import load_data
 from ..datasets.transformer import split_and_transform_data
 from ..utils.bench_case import get_bench_case_value
 from ..utils.common import convert_to_numpy, custom_format, get_module_members
-from ..utils.config import bench_case_filter
+from ..common.filtering import bench_case_filter
 from ..utils.custom_types import BenchCase, Numeric, NumpyNumeric
 from ..utils.logger import logger
 from ..utils.measurement import measure_case

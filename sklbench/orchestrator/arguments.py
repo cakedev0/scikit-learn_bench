@@ -1,19 +1,3 @@
-# ===============================================================================
-# Copyright 2024 Intel Corporation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ===============================================================================
-
 import argparse
 from typing import Dict, List
 
@@ -21,8 +5,6 @@ import pandas as pd
 
 
 def get_parser_description(parser: argparse.ArgumentParser) -> pd.DataFrame:
-    """Convert parser description to Markdown-style table."""
-
     def get_argument_actions(parser: argparse.ArgumentParser) -> List:
         arg_actions = []
 
@@ -50,21 +32,22 @@ def get_parser_description(parser: argparse.ArgumentParser) -> pd.DataFrame:
     )
 
 
-def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    # verbosity levels
+def add_orchestrator_arguments(
+    parser: argparse.ArgumentParser,
+) -> argparse.ArgumentParser:
     parser.add_argument(
         "--runner-log-level",
         default="WARNING",
         type=str,
         choices=("ERROR", "WARNING", "INFO", "DEBUG"),
-        help="Logging level for benchmarks runner.",
+        help="Logging level for benchmarks orchestrator.",
     )
     parser.add_argument(
         "--bench-log-level",
         default="WARNING",
         type=str,
         choices=("ERROR", "WARNING", "INFO", "DEBUG"),
-        help="Logging level for each running benchmark.",
+        help="Logging level for each benchmark runner process.",
     )
     parser.add_argument(
         "--log-level",
@@ -75,7 +58,6 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         help="Global logging level for benchmarks: "
         "overwrites runner and benchmarks logging levels.",
     )
-    # benchmarking cases finding, overwriting and filtering
     parser.add_argument(
         "--config",
         "--configs",
@@ -83,8 +65,7 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         type=str,
         nargs="+",
         default=None,
-        help="Paths to a configuration files or/and "
-        "directories that contain configuration files.",
+        help="Paths to configuration files or directories with configuration files.",
     )
     parser.add_argument(
         "--parameters",
@@ -93,8 +74,7 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         default="",
         type=str,
         nargs="+",
-        help="Globally defines or overwrites config parameters. "
-        "For example: `-p data:dtype=float32 data:order=F`.",
+        help="Globally defines or overwrites config parameters.",
     )
     parser.add_argument(
         "--templates",
@@ -112,10 +92,8 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         default="",
         type=str,
         nargs="+",
-        help="Filters benchmarking cases by parameter values. "
-        "For example: `-f data:dtype=float32 data:order=F`.",
+        help="Filters benchmarking cases by parameter values.",
     )
-
     parser.add_argument(
         "--results-dir",
         type=str,
@@ -128,14 +106,12 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         action="store_true",
         help="Load all requested datasets in parallel before running benchmarks.",
     )
-    # workflow control
     parser.add_argument(
         "--exit-on-error",
         default=False,
         action="store_true",
-        help="Interrupt runner and exit if last benchmark failed with error.",
+        help="Interrupt orchestrator and exit if last benchmark failed with error.",
     )
-    # option to get parser description in Markdown table format for READMEs
     parser.add_argument(
         "--describe-parser",
         default=False,
@@ -145,12 +121,10 @@ def add_runner_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
     return parser
 
 
-def get_runner_parser() -> argparse.ArgumentParser:
+def get_orchestrator_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m sklbench",
-        description="""
-            Scikit-learn_bench runner
-            """,
+        description="Scikit-learn_bench orchestrator",
     )
-    add_runner_arguments(parser)
+    add_orchestrator_arguments(parser)
     return parser

@@ -16,17 +16,26 @@
 
 import sys
 
-from sklbench.runner import get_parser_description, get_runner_parser, run_benchmarks
+from sklbench.orchestrator import get_orchestrator_parser, get_parser_description
+from sklbench.orchestrator import orchestrate_benchmarks
+from sklbench.parser import (
+    early_filtering,
+    generate_bench_cases,
+    generate_bench_filters,
+)
 
 
 def main():
-    parser = get_runner_parser()
+    parser = get_orchestrator_parser()
     args = parser.parse_args()
     if args.describe_parser:
         print(get_parser_description(parser))
         return 0
-    else:
-        return run_benchmarks(args)
+
+    bench_cases = generate_bench_cases(args)
+    param_filters = generate_bench_filters(args.parameter_filters)
+    bench_cases = early_filtering(bench_cases, param_filters)
+    return orchestrate_benchmarks(bench_cases, param_filters, args)
 
 
 if __name__ == "__main__":

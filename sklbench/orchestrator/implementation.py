@@ -1,21 +1,3 @@
-# ===============================================================================
-# Copyright 2024 Intel Corporation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ===============================================================================
-
-
-import argparse
 import json
 from datetime import datetime, timezone
 from multiprocessing import Pool
@@ -26,17 +8,13 @@ from psutil import cpu_count
 from tqdm import tqdm
 
 from ..datasets import load_data_with_cleanup
+from ..common.filtering import bench_case_filter
 from ..utils.bench_case import get_bench_case_name, get_data_name
 from ..utils.common import custom_format, hash_from_json_repr
-from ..utils.config import (
-    early_filtering,
-    generate_bench_cases,
-    generate_bench_filters,
-)
 from ..utils.custom_types import BenchCase
 from ..utils.env import get_environment_info
 from ..utils.logger import logger
-from .commands_helper import run_benchmark_from_case
+from .commands import run_runner_from_case
 
 
 def get_hardware_hash(hardware_info: Dict) -> str:
@@ -47,17 +25,68 @@ def get_software_hash(software_info: Dict) -> str:
     return hash_from_json_repr(software_info, hash_limit=6)
 
 
+def _merge_attributes(metrics: Dict, attributes: Dict) -> Dict:
+    if not attributes:
+        return metrics
+    metrics = {method: dict(values) for method, values in metrics.items()}
+    for method, method_attributes in attributes.items():
+        if isinstance(method_attributes, dict):
+            metrics.setdefault(method, {}).update(method_attributes)
+    return metrics
+
+
+def aggregate_runner_rows(rows: List[Dict]) -> List[Dict]:
+    if not rows:
+        return []
+
+    first = rows[0]
+    methods = []
+    for row in rows:
+        for method in row.get("time_ms", {}):
+            if method not in methods:
+                methods.append(method)
+
+    times = {method: [] for method in methods}
+    for row in rows:
+        for method in methods:
+            method_time = row.get("time_ms", {}).get(method)
+            if method_time is not None:
+                times[method].append(method_time)
+
+    metrics = _merge_attributes(
+        first.get("metrics", {}),
+        first.get("attributes", {}),
+    )
+    return [
+        {
+            "case": first.get("case", {}),
+            "data_desc": first.get("data_desc", {}),
+            "time[ms]": times,
+            "metrics": metrics,
+            "logs": first.get("logs", {"stdout": "", "stderr": ""}),
+        }
+    ]
+
+
 def call_benchmarks(
     bench_cases: List[BenchCase],
     filters: List[BenchCase],
     log_level: str = "WARNING",
     early_exit: bool = False,
 ) -> Tuple[int, List[Dict], List[Dict]]:
-    """Iterates over benchmarking cases with progress bar and combines their results"""
-    results = list()
-    failed_cases = list()
+    results = []
+    failed_cases = []
     return_code = 0
-    bench_cases_with_pbar = tqdm(bench_cases)
+    filtered_cases = [
+        bench_case for bench_case in bench_cases if bench_case_filter(bench_case, filters)
+    ]
+    if len(filtered_cases) != len(bench_cases):
+        logger.info(
+            "Filtering reduced number of cases from "
+            f"{len(bench_cases)} to {len(filtered_cases)}."
+        )
+
+    bench_cases_with_pbar = tqdm(filtered_cases)
     for bench_case in bench_cases_with_pbar:
         bench_cases_with_pbar.set_description(
             custom_format(
@@ -65,8 +94,8 @@ def call_benchmarks(
             )
         )
         try:
-            bench_return_code, bench_entries, failed_case = run_benchmark_from_case(
-                bench_case, filters, log_level
+            bench_return_code, rows, failed_case = run_runner_from_case(
+                bench_case, log_level
             )
             if bench_return_code != 0:
                 return_code = bench_return_code
@@ -74,7 +103,7 @@ def call_benchmarks(
                     failed_cases.append(failed_case)
                 if early_exit:
                     break
-            results.extend(bench_entries)
+            results.extend(aggregate_runner_rows(rows))
         except KeyboardInterrupt:
             return_code = -1
             break
@@ -114,7 +143,7 @@ def save_results(
     ]
     for env_file, env_content in env_files:
         try:
-            with open(env_file, "x") as fp:
+            with env_file.open("x", encoding="utf-8") as fp:
                 json.dump(env_content, fp, indent=4)
         except FileExistsError:
             pass
@@ -127,37 +156,26 @@ def save_results(
     }
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     result_file = results_root / f"{timestamp}.json"
-    with open(result_file, "x") as fp:
+    with result_file.open("x", encoding="utf-8") as fp:
         json.dump(result, fp, indent=4)
     logger.warning(f"Benchmark results saved to {result_file}")
 
 
-def run_benchmarks(args: argparse.Namespace) -> int:
-    # overwrite all logging levels if requested
+def orchestrate_benchmarks(
+    bench_cases: List[BenchCase],
+    filters: List[BenchCase],
+    args,
+) -> int:
     if args.log_level is not None:
         for log_type in ["runner", "bench"]:
             setattr(args, f"{log_type}_log_level", args.log_level)
-    # set logging level
     logger.setLevel(args.runner_log_level)
 
     env_info = get_environment_info()
     hardware_hash = get_hardware_hash(env_info["hardware"])
     software_hash = get_software_hash(env_info["software"])
 
-    # find and parse configs
-    bench_cases = generate_bench_cases(args)
-
-    # get parameter filters
-    param_filters = generate_bench_filters(args.parameter_filters)
-
-    # perform early filtering based on 'data' parameters and
-    # some of 'algorithm' parameters assuming they were already assigned
-    bench_cases = early_filtering(bench_cases, param_filters)
-
-    # prefetch datasets
     if args.prefetch_datasets:
-        # trick: get unique dataset names only to avoid loading of same dataset
-        # by different cases/processes
         dataset_cases = {get_data_name(case): case for case in bench_cases}
         n_datasets = len(dataset_cases)
         logger.debug(f"Unique dataset names to load:\n{list(dataset_cases.keys())}")
@@ -166,17 +184,13 @@ def run_benchmarks(args: argparse.Namespace) -> int:
         with Pool(n_proc) as pool:
             pool.map(load_data_with_cleanup, dataset_cases.values())
 
-    # run bench_cases
     return_code, result, failed_cases = call_benchmarks(
         bench_cases,
-        param_filters,
+        filters,
         args.bench_log_level,
         args.exit_on_error,
     )
-    # output raw result
     logger.debug(custom_format(result))
-
-    # save results to append-only results directory
     save_results(
         result,
         failed_cases,
@@ -185,5 +199,4 @@ def run_benchmarks(args: argparse.Namespace) -> int:
         env_info,
         args.results_dir,
     )
-
     return return_code

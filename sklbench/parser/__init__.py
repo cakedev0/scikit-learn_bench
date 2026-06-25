@@ -1,4 +1,4 @@
-from ..parser import (
+from .implementation import (
     bench_case_filter,
     early_filtering,
     expand_ranges_in_template,

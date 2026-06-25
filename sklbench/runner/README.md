@@ -1,66 +1,23 @@
-# Benchmarks Runner
+# Benchmark Runner
 
-**Scikit-learn_bench** runner orchestrates running of the individual benchmarks based on provided config files, parameters, filters, and other arguments.
+`sklbench.runner` executes one already-expanded benchmark case.
 
-Runner consumes the following types of arguments:
- - Settings defining benchmarking cases (config location\[s\], global parameters, and filters)
- - Verbosity levels for different scikit-learn_bench stages (runner and benchmarks)
- - Settings for raw benchmarks output
- - Scikit-learn_bench workflow parameters
+It is intentionally separate from config parsing and orchestration:
 
-And follows the next steps:
+- the parser generates resolved benchmark cases;
+- the orchestrator records environments, launches runner subprocesses, captures
+  logs/errors, and writes result files;
+- the runner loads data for one case, runs repetitions, and writes JSONL.
 
-1. Generate benchmarking cases
-2. Filter them if possible to compare parameters and filters (early filtering)
-3. Prefetch datasets in parallel if explicitly requested with a special argument
-4. Sequentially call individual benchmarks as subprocesses
-5. Write environment metadata and raw benchmark results to append-only JSON files
+## CLI Contract
 
-See [benchmarking config specification](../../docs/README.md) for explanation of config files formatting.
-
-```mermaid
-flowchart LR
-    A["Configs reading"] --> B
-    B["Filtering of bench. cases"] --> P
-    P["Datasets prefetching\n[optional]"] --> C
-    B --> C
-    C["Benchmarks calling"] --> D
-    D["Raw results output"]
-
-    classDef optional stroke-dasharray: 8 8
-    class P optional
+```bash
+python -m sklbench.runner \
+  --case-file /path/to/case.json \
+  --output-jsonl /tmp/sklbench-result.jsonl \
+  --log-level WARNING
 ```
 
-## Arguments
-<!-- Note: generate arguments table using runner: `python -m sklbench --describe-parser` -->
-
-| Name                                           | Type   | Default value                                       | Choices                                        | Description                                                                                                                      |
-|:-----------------------------------------------|:-------|:----------------------------------------------------|:-----------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------|
-| `--runner-log-level`                           | str    | WARNING                                             | ('ERROR', 'WARNING', 'INFO', 'DEBUG')          | Logging level for benchmarks runner.                                                                                             |
-| `--bench-log-level`                            | str    | WARNING                                             | ('ERROR', 'WARNING', 'INFO', 'DEBUG')          | Logging level for each running benchmark.                                                                                        |
-| `--log-level`</br>`-l`                         | str    |                                                     | ('ERROR', 'WARNING', 'INFO', 'DEBUG')          | Global logging level for benchmarks: overwrites runner and benchmarks logging levels.                                            |
-| `--config`</br>`--configs`</br>`-c`            | str    |                                                     |                                                | Paths to a configuration files or/and directories that contain configuration files.                                              |
-| `--parameters`</br>`--params`</br>`-p`         | str    |                                                     |                                                | Globally defines or overwrites config parameters. For example: `-p data:dtype=float32 data:order=F`.                             |
-| `--templates`</br>`--template`</br>`-t`        | str    |                                                     |                                                | Filters config templates by name before benchmark cases are generated.                                                           |
-| `--parameter-filters`</br>`--filters`</br>`-f` | str    |                                                     |                                                | Filters benchmarking cases by parameter values. For example: `-f data:dtype=float32 data:order=F`.                               |
-| `--results-dir`                                | str    | results                                             |                                                | Directory path to store scikit-learn_bench results.                                                                              |
-| `--prefetch-datasets`                          |        | False                                               |                                                | Load all requested datasets in parallel before running benchmarks.                                                               |
-| `--exit-on-error`                              |        | False                                               |                                                | Interrupt runner and exit if last benchmark failed with error.                                                                   |
-| `--describe-parser`                            |        | False                                               |                                                | Print parser description in Markdown table format and exit.                                                                      |
-
-Results are written under `results/` by default:
-
-```text
-results/
-  hardware-envs/
-    <hardware_hash>.json
-  software-envs/
-    <software_hash>.json
-  <YYYYMMDDTHHMMSSffffffZ>.json
-```
-
-Result files contain top-level `hardware_hash`, `software_hash`, `bench_cases`,
-and `failed_cases` keys. Hardware and software environment filenames are their
-hashes.
----
-[Documentation tree](../../README.md#-documentation)
+The output file contains one JSON object per repetition. Each line includes the
+case, repetition index, data description, per-method timings in milliseconds,
+metrics, model attributes, and warnings.
