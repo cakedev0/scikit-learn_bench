@@ -140,4 +140,3 @@ record timings and metrics.
 - [Benchmarks Runner](sklbench/runner/README.md)
 - [Reports](sklbench/reports/README.md)
 - [Data Processing and Storage](sklbench/datasets/README.md)
-- [Emulators](sklbench/emulators/README.md)
