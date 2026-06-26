@@ -1,22 +1,19 @@
 import argparse
-import inspect
 import json
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import numpy as np
+import timeit
 
-from ..benchmarks.sklearn_estimator import (
-    estimator_to_task,
-    get_context,
-    get_estimator,
-    get_subset_metrics_of_estimator,
-)
-from ..config import BenchCase, Bench
+from ..config import BenchCase, Bench, Implementation
 from ..datasets import load_data
 from ..datasets.transformer import split_and_transform_data
 from ..utils.logger import logger
 from ..utils.measurement import measure_perf
+
+from .estimator import estimator_to_task, get_estimator, get_context
+from .metrics import get_subset_metrics_of_estimator
 
 
 def _as_jsonable(value: Any):
@@ -65,7 +62,6 @@ def _collect_model_attributes(estimator_instance) -> Dict[str, Any]:
 
 def _measure_single_method(bench_params: Bench, method_instance, data_args):
     time_limit = bench_params.time_limit if bench_params.time_limit is not None else 3600
-    cost_per_hour = bench_params.cost_per_hour if bench_params.cost_per_hour is not None else 0.0
     return measure_perf(
         method_instance,
         *data_args,
@@ -77,7 +73,6 @@ def _measure_single_method(bench_params: Bench, method_instance, data_args):
         enable_cpu_profiling=bench_params.cpu_profile or False,
         enable_memory_profiling=bench_params.memory_profile or False,
         enable_nvml_profiling=False,
-        cost_per_hour=cost_per_hour,
     )
 
 
@@ -93,8 +88,8 @@ def run_case_once(
     task: str,
     data,
     data_description: Dict,
-    repeat: int,
 ) -> Dict:
+    task = estimator_to_task(bench_case.algorithm.estimator)
     X_train, X_test, y_train, y_test = data
 
     raw_metrics = {
@@ -104,7 +99,7 @@ def run_case_once(
             (X_train,  y_train)
         ),
         "predict": _measure_single_method(
-            bench_case,
+            bench_case.bench,
             estimator.predict,
             (X_test, y_test),
         )
@@ -129,13 +124,11 @@ def run_case_once(
         data_desc["predict"].update({"n_classes": data_description["n_classes"]})
 
     return {
-        "case": bench_case.model_dump(mode="json", exclude_none=True),
-        "repeat": repeat,
         "data_desc": data_desc,
         "time_ms": times,
         "metrics": quality_metrics,
         "execution_metrics": execution_metrics,
-        "attributes": {_collect_model_attributes(estimator)},
+        "attributes": _collect_model_attributes(estimator),
     }
 
 
@@ -156,20 +149,24 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     if n_runs is None:
         n_runs = 10
 
-    context_class, context_params = get_context(bench_case_dict)
-    with output_jsonl.open("w", encoding="utf-8") as fp:
+    time_limit = bench_case.bench.time_limit if bench_case.bench.time_limit is not None else 600
+
+    with output_jsonl.open("w", encoding="utf-8") as fp, get_context(bench_case.implementation):
+        t0 = timeit.default_timer()
         for repeat in range(n_runs):
-            with context_class(**context_params):
-                row = run_case_once(
-                    bench_case,
-                    estimator_class(**estimator_params),
-                    task,
-                    data,
-                    data_description,
-                    repeat,
-                )
+            row = run_case_once(
+                bench_case,
+                estimator_class(**estimator_params),
+                task,
+                data,
+                data_description,
+                repeat,
+            )
             fp.write(json.dumps(row) + "\n")
             fp.flush()
+            if timeit.default_timer() - t0 > time_limit:
+                logger.warning(f"runner exceeded time limit ({time_limit} seconds)")
+                break
 
 
 def parse_args() -> argparse.Namespace:

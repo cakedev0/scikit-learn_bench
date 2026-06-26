@@ -25,47 +25,11 @@ def get_software_hash(software_info: Dict) -> str:
     return hash_from_json_repr(software_info, hash_limit=6)
 
 
-def _merge_attributes(metrics: Dict, attributes: Dict) -> Dict:
-    if not attributes:
-        return metrics
-    metrics = {method: dict(values) for method, values in metrics.items()}
-    for method, method_attributes in attributes.items():
-        if isinstance(method_attributes, dict):
-            metrics.setdefault(method, {}).update(method_attributes)
-    return metrics
-
-
 def aggregate_runner_rows(rows: List[Dict]) -> List[Dict]:
-    if not rows:
-        return []
-
-    first = rows[0]
-    methods = []
-    for row in rows:
-        for method in row.get("time_ms", {}):
-            if method not in methods:
-                methods.append(method)
-
-    times = {method: [] for method in methods}
-    for row in rows:
-        for method in methods:
-            method_time = row.get("time_ms", {}).get(method)
-            if method_time is not None:
-                times[method].append(method_time)
-
-    metrics = _merge_attributes(
-        first.get("metrics", {}),
-        first.get("attributes", {}),
-    )
-    return [
-        {
-            "case": first.get("case", {}),
-            "data_desc": first.get("data_desc", {}),
-            "time[ms]": times,
-            "metrics": metrics,
-            "logs": first.get("logs", {"stdout": "", "stderr": ""}),
-        }
-    ]
+    # TODO:
+    # input: [{"time_ms": {"fit": 23, "predict": ...}, "attributes": {...}, ...}, ...]
+    # output: {"time_ms": {"fit": [23, ...], "predict": [...]}, "attributes": [...], ...}
+    pass
 
 
 def call_benchmarks(
@@ -103,7 +67,15 @@ def call_benchmarks(
                     failed_cases.append(failed_case)
                 if early_exit:
                     break
-            results.extend(aggregate_runner_rows(rows))
+            results.append({
+                "case": bench_case,
+                **aggregate_runner_rows(rows),
+                "logs": {
+                    # TODO: what should go there?
+                    "stdout": "", 
+                    "stderr": ""
+                },
+            })
         except KeyboardInterrupt:
             return_code = -1
             break

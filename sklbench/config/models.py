@@ -29,7 +29,6 @@ class Bench(_Section):
     gc_collect: bool | None = None
     cpu_profile: bool | None = None
     memory_profile: bool | None = None
-    cost_per_hour: float | None = None
 
 
 class Algorithm(_Section):
