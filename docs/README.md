@@ -17,14 +17,9 @@ stateDiagram-v2
 
     state BenchmarksRunner {
         ArgumentParser --> ConfigLoader: config_script
-        ArgumentParser --> Benchmarks: other_arguments
-        ConfigLoader --> Benchmarks: validated benchmark_cases
-
-        state Benchmarks {
-            SklearnLikeEstimator --> raw_results[JSON]
-            ... --> raw_results[JSON]
-            Functional --> raw_results[JSON]
-        }
+        ArgumentParser --> Runner: other_arguments
+        ConfigLoader --> Runner: validated benchmark_cases
+        Runner --> raw_results[JSON]
     }
 ```
 
@@ -32,10 +27,8 @@ Scikit-learn_bench consists of three main parts:
  - **Benchmarks runner**:
      1. Consumes user-provided high-level arguments (argument parser).
      2. Loads a Python config script and validates generated benchmark cases.
-     3. Combines the raw outputs.
- - **Individual benchmarks** wrapping specific entities or workloads (sklearn-like estimators, custom functions, etc.)
-
-Runner is responsible for orchestration of benchmarking cases, individual benchmarks - for actual run of each case.
+     3. Runs sklearn-like estimator cases in subprocesses.
+     4. Combines the raw outputs.
 
 ## Python config workflow
 

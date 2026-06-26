@@ -25,11 +25,61 @@ def get_software_hash(software_info: Dict) -> str:
     return hash_from_json_repr(software_info, hash_limit=6)
 
 
-def aggregate_runner_rows(rows: List[Dict]) -> List[Dict]:
-    # TODO:
-    # input: [{"time_ms": {"fit": 23, "predict": ...}, "attributes": {...}, ...}, ...]
-    # output: {"time_ms": {"fit": [23, ...], "predict": [...]}, "attributes": [...], ...}
-    pass
+def _append_metric_value(values: List, value):
+    if isinstance(value, list):
+        values.extend(value)
+    else:
+        values.append(value)
+
+
+def _merge_method_metrics(rows: List[Dict]) -> Dict:
+    first_row = rows[0]
+    metrics = {
+        method: dict(method_metrics)
+        for method, method_metrics in first_row.get("metrics", {}).items()
+    }
+    for row in rows:
+        for method, method_metrics in row.get("execution_metrics", {}).items():
+            method_result = metrics.setdefault(method, {})
+            for metric_name, metric_value in method_metrics.items():
+                _append_metric_value(
+                    method_result.setdefault(metric_name, []), metric_value
+                )
+
+    attributes = first_row.get("attributes", {})
+    if attributes:
+        metrics.setdefault("fit", {}).update(attributes)
+    return metrics
+
+
+def aggregate_runner_rows(rows: List[Dict]) -> Dict:
+    if not rows:
+        return {
+            "data_desc": {},
+            "time[ms]": {},
+            "metrics": {},
+            "logs": {"stdout": "", "stderr": ""},
+        }
+
+    method_names = []
+    for row in rows:
+        for method in row.get("time_ms", {}):
+            if method not in method_names:
+                method_names.append(method)
+
+    times = {method: [] for method in method_names}
+    for row in rows:
+        for method in method_names:
+            if method in row.get("time_ms", {}):
+                times[method].append(row["time_ms"][method])
+
+    first_row = rows[0]
+    return {
+        "data_desc": first_row.get("data_desc", {}),
+        "time[ms]": times,
+        "metrics": _merge_method_metrics(rows),
+        "logs": first_row.get("logs", {"stdout": "", "stderr": ""}),
+    }
 
 
 def call_benchmarks(
@@ -67,15 +117,7 @@ def call_benchmarks(
                     failed_cases.append(failed_case)
                 if early_exit:
                     break
-            results.append({
-                "case": bench_case,
-                **aggregate_runner_rows(rows),
-                "logs": {
-                    # TODO: what should go there?
-                    "stdout": "", 
-                    "stderr": ""
-                },
-            })
+            results.append({"case": bench_case, **aggregate_runner_rows(rows)})
         except KeyboardInterrupt:
             return_code = -1
             break

@@ -6,9 +6,14 @@ from pathlib import Path
 from time import time
 from typing import Dict, List, Optional, Tuple
 
-from ..utils.bench_case import get_bench_case_name, get_bench_case_value
+from ..utils.bench_case import get_bench_case_name
 from ..utils.common import hash_from_json_repr
 from ..utils.custom_types import BenchCase
+
+
+def _section(bench_case: BenchCase, name: str) -> Dict:
+    section = bench_case.get(name, {})
+    return section if isinstance(section, dict) else {}
 
 
 def generate_runner_command(
@@ -17,26 +22,23 @@ def generate_runner_command(
     output_jsonl: Path,
     log_level: str,
 ) -> List[str]:
+    bench = _section(bench_case, "bench")
     command_prefix: List[str] = []
-    taskset = get_bench_case_value(bench_case, "bench:taskset")
+    taskset = bench.get("taskset")
     if taskset is not None:
         command_prefix.extend(["taskset", "-c", str(taskset)])
 
-    distribution = get_bench_case_value(bench_case, "bench:distributor")
+    distribution = bench.get("distributor")
     if distribution == "mpi":
-        mpi_params = get_bench_case_value(bench_case, "bench:mpi_params", dict())
+        mpi_params = bench.get("mpi_params", {})
         mpi_prefix = ["mpirun"]
         for mpi_param_name, mpi_param_value in mpi_params.items():
             mpi_prefix.extend([f"-{mpi_param_name}", str(mpi_param_value)])
         command_prefix = mpi_prefix + command_prefix
 
-    vtune_profiling = get_bench_case_value(bench_case, "bench:vtune_profiling")
+    vtune_profiling = bench.get("vtune_profiling")
     if vtune_profiling is not None and sys.platform == "linux":
-        vtune_result_dir = Path(
-            get_bench_case_value(
-                bench_case, "bench:vtune_results_directory", "_vtune_results"
-            )
-        )
+        vtune_result_dir = Path(bench.get("vtune_results_directory", "_vtune_results"))
         vtune_result_dir.mkdir(parents=True, exist_ok=True)
         vtune_result_path = vtune_result_dir / "_".join(
             [
@@ -84,7 +86,7 @@ def parse_runner_jsonl(output_jsonl: Path) -> List[Dict]:
 def run_runner_from_case(
     bench_case: BenchCase, log_level: str
 ) -> Tuple[int, List[Dict], Optional[Dict]]:
-    bench_time_limit = get_bench_case_value(bench_case, "bench:time_limit", 3600)
+    bench_time_limit = _section(bench_case, "bench").get("time_limit") or 3600
     command_timeout = bench_time_limit * 1.5 + 10
     with tempfile.TemporaryDirectory(prefix="sklbench-run-") as tmp_dir:
         tmp_path = Path(tmp_dir)

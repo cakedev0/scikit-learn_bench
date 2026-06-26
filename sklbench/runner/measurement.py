@@ -1,0 +1,172 @@
+import gc
+import threading
+import timeit
+from math import ceil, sqrt
+from time import sleep
+from typing import Dict, List
+
+import numpy as np
+import psutil
+from cpuinfo import get_cpu_info
+
+from ..utils.env import get_number_of_sockets
+from ..utils.logger import logger
+
+try:
+    import itt
+
+    itt_is_available = True
+except (ImportError, ModuleNotFoundError):
+    itt_is_available = False
+
+try:
+    import pynvml
+
+    try:
+        pynvml.nvmlInit()
+        nvml_is_available = True
+    except pynvml.NVMLError:
+        nvml_is_available = False
+except (ImportError, ModuleNotFoundError):
+    nvml_is_available = False
+
+
+def _get_n_from_cache_size():
+    cache_size = 0
+    cpu_info = get_cpu_info()
+    if "l3_cache_size" in cpu_info:
+        cache_size += cpu_info["l3_cache_size"]
+    if "l2_cache_size" in cpu_info:
+        cache_size += cpu_info["l2_cache_size"] * psutil.cpu_count(logical=False)
+    n_sockets = get_number_of_sockets()
+    return ceil(sqrt(n_sockets * cache_size / 8))
+
+
+def _flush_cache(n: int | None = None):
+    if n is None:
+        n = _get_n_from_cache_size()
+    np.matmul(np.random.rand(n, n), np.random.rand(n, n))
+
+
+def _get_ram_usage():
+    return psutil.Process().memory_info().rss
+
+
+def _get_vram_usage():
+    pid = psutil.Process().pid
+
+    device_count = pynvml.nvmlDeviceGetCount()
+    vram_usage = 0
+    for device_index in range(device_count):
+        handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
+        process_info = pynvml.nvmlDeviceGetComputeRunningProcesses(handle)
+        for process in process_info:
+            if process.pid == pid:
+                vram_usage += process.usedGpuMemory
+    return vram_usage
+
+
+def _monitor_memory_usage(
+    interval: float,
+    memory_profiles: Dict[str, List],
+    stop_event,
+    enable_nvml_profiling: bool,
+):
+    while not stop_event.is_set():
+        memory_profiles["RAM"].append(_get_ram_usage())
+        if enable_nvml_profiling:
+            memory_profiles["VRAM"].append(_get_vram_usage())
+        sleep(interval)
+
+
+def measure_perf(
+    func,
+    *args,
+    n_runs: int,
+    time_limit: float,
+    enable_itt: bool,
+    enable_cache_flushing: bool,
+    enable_garbage_collection: bool,
+    enable_cpu_profiling: bool,
+    enable_memory_profiling: bool,
+    enable_nvml_profiling: bool = False,
+    memory_profiling_interval: float = 0.001,
+    **kwargs,
+):
+    if enable_itt and not itt_is_available:
+        logger.warning(
+            "Intel(R) VTune(TM) profiling was requested "
+            'but "itt" python module is not available.'
+        )
+        enable_itt = False
+
+    times = []
+    if enable_cpu_profiling:
+        cpu_loads = []
+    if enable_memory_profiling:
+        memory_peaks = {"RAM": []}
+        if enable_nvml_profiling:
+            memory_peaks["VRAM"] = []
+
+    while len(times) < n_runs:
+        if enable_cache_flushing:
+            _flush_cache()
+        if enable_itt:
+            itt.resume()
+        if enable_memory_profiling:
+            memory_profiles = {"RAM": []}
+            if enable_nvml_profiling:
+                memory_profiles["VRAM"] = []
+            profiling_stop_event = threading.Event()
+            profiling_thread = threading.Thread(
+                target=_monitor_memory_usage,
+                args=(
+                    memory_profiling_interval,
+                    memory_profiles,
+                    profiling_stop_event,
+                    enable_nvml_profiling,
+                ),
+            )
+            profiling_thread.start()
+        if enable_cpu_profiling:
+            psutil.cpu_percent(interval=None)
+
+        t0 = timeit.default_timer()
+        _ = func(*args, **kwargs)
+        t1 = timeit.default_timer()
+
+        if enable_cpu_profiling:
+            cpu_loads.append(psutil.cpu_percent(interval=None))
+        if enable_memory_profiling:
+            profiling_stop_event.set()
+            profiling_thread.join()
+            memory_peaks["RAM"].append(max(memory_profiles["RAM"]))
+            if enable_nvml_profiling:
+                memory_peaks["VRAM"].append(max(memory_profiles["VRAM"]))
+        if enable_itt:
+            itt.pause()
+
+        times.append(t1 - t0)
+        if enable_garbage_collection:
+            gc.collect()
+        if sum(times) > time_limit:
+            logger.warning(
+                f"'{func}' function measurement time "
+                f"({sum(times)} seconds from {len(times)} runs) "
+                f"exceeded time limit ({time_limit} seconds)"
+            )
+            break
+
+    perf_metrics = {"time[ms]": [time * 1000 for time in times]}
+    if enable_memory_profiling:
+        perf_metrics["peak RAM usage[MB]"] = [
+            memory_peak / 2**20 for memory_peak in memory_peaks["RAM"]
+        ]
+        if enable_nvml_profiling:
+            perf_metrics["peak VRAM usage[MB]"] = [
+                memory_peak / 2**20 for memory_peak in memory_peaks["VRAM"]
+            ]
+    if enable_cpu_profiling:
+        perf_metrics["cpu load[%]"] = cpu_loads
+
+    return perf_metrics

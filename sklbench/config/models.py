@@ -32,8 +32,7 @@ class Bench(_Section):
 
 
 class Algorithm(_Section):
-    estimator: str | None = None
-    function: str | None = None
+    estimator: str
     estimator_params: JsonDict = Field(default_factory=dict)
 
 

@@ -20,5 +20,5 @@ python -m sklbench.runner \
 ```
 
 The output file contains one JSON object per repetition. Each line includes the
-case, repetition index, data description, per-method timings in milliseconds,
-metrics, model attributes, and warnings.
+repetition index, data description, per-method timings in milliseconds, quality
+metrics, execution metrics, and model attributes.

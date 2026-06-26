@@ -6,24 +6,20 @@ from ..utils.logger import logger
 
 
 TASK_TO_ESTIMATOR_SUFFIXES = {
-    "classification": [
-        "Classifier",
-        "LogisticRegression",
-        "SVC"
-    ],
+    "classification": ["Classifier", "LogisticRegression", "SVC"],
     "regression": [
         "Regressor",
         "LinearRegression",
         "Ridge",
         "Lasso",
         "ElasticNet",
-        "SVR"
+        "SVR",
     ],
     "clustering": ["DBSCAN", "KMeans"],
     "decomposition": ["PCA"],
     "manifold": ["TSNE"],
     "search": ["NearestNeighbors"],
-    "utility": ["BasicStatistics", "Covariance"]
+    "utility": ["BasicStatistics", "Covariance"],
 }
 
 
@@ -36,8 +32,8 @@ def estimator_to_task(estimator_name: str) -> str:
 
 
 def get_estimator(library_name: str, estimator_name: str):
-    # Here we'll remap some public classes to interal ones if a 
-    # wrapper is need for compatibility with sklearn API
+    # Public classes can be remapped here to wrappers when sklearn API
+    # compatibility needs a small adapter.
 
     classes_map, _ = get_module_members(library_name.split("."))
     if estimator_name not in classes_map:

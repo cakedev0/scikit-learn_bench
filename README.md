@@ -17,7 +17,6 @@ Benefits:
     - [Benchmarks Runner](#benchmarks-runner)
     - [Python Configs](#python-configs)
     - [Scikit-learn\_bench High-Level Workflow](#scikit-learn_bench-high-level-workflow)
-  - [📚 Benchmark Types](#-benchmark-types)
   - [📑 Documentation](#-documentation)
 
 ## 🔧 Create a Python Environment
@@ -111,25 +110,20 @@ For the accepted case format, see the Pydantic models in
 ```mermaid
 flowchart TB
     A[User] -- High-level arguments --> B[Benchmarks runner]
-    B -- Generated benchmarking cases --> C["Benchmarks collection"]
-    C -- Raw JSON-formatted results --> A
+    B -- Raw JSON-formatted results --> A
 
     classDef userStyle fill:#44b,color:white,stroke-width:2px,stroke:white;
     class A userStyle
 ```
 
-## 📚 Benchmark Types
-
-**Scikit-learn_bench** supports the following types of benchmarks:
-
- - **Scikit-learn estimator** - Measures performance and quality metrics of the [sklearn-like estimator](https://scikit-learn.org/stable/glossary.html#term-estimator).
- - **Function** - Measures performance metrics of specified function.
+The runner currently executes sklearn-like estimator cases: load or generate
+data, preprocess and split it, instantiate the estimator, fit, predict, and
+record timings and metrics.
 
 ## 📑 Documentation
 [Scikit-learn_bench](README.md):
 - [Benchmarks Runner](sklbench/runner/README.md)
 - [Reports](sklbench/reports/README.md)
-- [Benchmarks](sklbench/benchmarks/README.md)
 - [Data Processing and Storage](sklbench/datasets/README.md)
 - [Emulators](sklbench/emulators/README.md)
 - [Developer Guide](docs/README.md)

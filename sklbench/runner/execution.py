@@ -6,13 +6,13 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import timeit
 
-from ..config import BenchCase, Bench, Implementation
+from ..config import BenchCase, Bench
 from ..datasets import load_data
 from ..datasets.transformer import split_and_transform_data
 from ..utils.logger import logger
-from ..utils.measurement import measure_perf
 
 from .estimator import estimator_to_task, get_estimator, get_context
+from .measurement import measure_perf
 from .metrics import get_subset_metrics_of_estimator
 
 
@@ -85,9 +85,9 @@ def _split_time_and_metrics(result: Dict) -> Tuple[float, Dict]:
 def run_case_once(
     bench_case: BenchCase,
     estimator,
-    task: str,
     data,
     data_description: Dict,
+    repeat: int,
 ) -> Dict:
     task = estimator_to_task(bench_case.algorithm.estimator)
     X_train, X_test, y_train, y_test = data
@@ -96,13 +96,13 @@ def run_case_once(
         "fit": _measure_single_method(
             bench_case.bench,
             estimator.fit,
-            (X_train,  y_train)
+            (X_train, y_train),
         ),
         "predict": _measure_single_method(
             bench_case.bench,
             estimator.predict,
-            (X_test, y_test),
-        )
+            (X_test,),
+        ),
     }
 
     times = {}
@@ -111,8 +111,12 @@ def run_case_once(
         times[method], execution_metrics[method] = _split_time_and_metrics(method_metrics)
 
     quality_metrics = {
-        "fit": get_subset_metrics_of_estimator(task, "training", estimator, (X_train, y_train)),
-        "predict": get_subset_metrics_of_estimator(task, "inference", estimator, (X_test, y_test))
+        "fit": get_subset_metrics_of_estimator(
+            task, "training", estimator, (X_train, y_train)
+        ),
+        "predict": get_subset_metrics_of_estimator(
+            task, "inference", estimator, (X_test, y_test)
+        ),
     }
 
     data_desc = {
@@ -124,6 +128,7 @@ def run_case_once(
         data_desc["predict"].update({"n_classes": data_description["n_classes"]})
 
     return {
+        "repeat": repeat,
         "data_desc": data_desc,
         "time_ms": times,
         "metrics": quality_metrics,
@@ -137,7 +142,6 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     library_name = bench_case.implementation.library
     estimator_name = bench_case.algorithm.estimator
     estimator_class = get_estimator(library_name, estimator_name)
-    task = estimator_to_task(estimator_name)
 
     raw_data, data_description = load_data(bench_case_dict)
     data, data_description = split_and_transform_data(
@@ -157,7 +161,6 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
             row = run_case_once(
                 bench_case,
                 estimator_class(**estimator_params),
-                task,
                 data,
                 data_description,
                 repeat,
