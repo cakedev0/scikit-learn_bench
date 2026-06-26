@@ -32,7 +32,7 @@ def main():
         parser.error("--config is required unless --describe-parser is used")
 
     bench_cases = load_cases_from_script(args.config)
-    return orchestrate_benchmarks(bench_cases, [], args)
+    return orchestrate_benchmarks(bench_cases, args)
 
 
 if __name__ == "__main__":

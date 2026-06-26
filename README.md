@@ -62,8 +62,8 @@ For a description of all benchmarks runner arguments, refer to [documentation](s
 
 Benchmark configs are trusted Python scripts. The orchestrator imports the
 script passed to `--config`, calls `generate_cases()`, validates each returned
-case with `sklbench.config.validate_case`, and passes normalized dictionaries to
-the runner.
+case with `sklbench.config.validate_case`, and passes `BenchCase` Pydantic
+models through orchestration.
 
 `generate_cases()` must return a `list[dict]`:
 
@@ -99,21 +99,36 @@ from sklbench.config import load_cases_from_script
 
 cases = load_cases_from_script("path/to/config.py")
 print(len(cases))
+print(cases[0].data.name(shortened=True))
 PY
 ```
 
 For the accepted case format, see the Pydantic models in
 [`sklbench/config/models.py`](sklbench/config/models.py).
 
+Config loading steps:
+
+1. Import the script passed to `--config`.
+2. Call `generate_cases()`.
+3. Validate every returned dict with `sklbench.config.validate_case`.
+4. Pass `BenchCase` Pydantic models through orchestration and serialize them
+   only at JSON boundaries.
+
 ### Scikit-learn_bench High-Level Workflow
 
 ```mermaid
-flowchart TB
-    A[User] -- High-level arguments --> B[Benchmarks runner]
-    B -- Raw JSON-formatted results --> A
+stateDiagram-v2
+    classDef inputOutput fill:#33b,color:white,stroke-width:2px,stroke:white;
 
-    classDef userStyle fill:#44b,color:white,stroke-width:2px,stroke:white;
-    class A userStyle
+    user_arguments:::inputOutput --> ArgumentParser
+    BenchmarksRunner --> raw_results[JSON]:::inputOutput
+
+    state BenchmarksRunner {
+        ArgumentParser --> ConfigLoader: config_script
+        ArgumentParser --> Runner: other_arguments
+        ConfigLoader --> Runner: validated benchmark_cases
+        Runner --> raw_results[JSON]
+    }
 ```
 
 The runner currently executes sklearn-like estimator cases: load or generate
@@ -126,4 +141,3 @@ record timings and metrics.
 - [Reports](sklbench/reports/README.md)
 - [Data Processing and Storage](sklbench/datasets/README.md)
 - [Emulators](sklbench/emulators/README.md)
-- [Developer Guide](docs/README.md)

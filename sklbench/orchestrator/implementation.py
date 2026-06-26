@@ -9,7 +9,6 @@ from tqdm import tqdm
 
 from ..config import BenchCase
 from ..datasets import load_data_with_cleanup
-from ..common.filtering import bench_case_filter
 from ..utils.common import custom_format, hash_from_json_repr
 from ..utils.logger import logger
 from .commands import run_runner_from_case
@@ -83,23 +82,14 @@ def aggregate_runner_rows(rows: List[Dict]) -> Dict:
 
 def call_benchmarks(
     bench_cases: List[BenchCase],
-    filters: List[BenchCase],
     log_level: str = "WARNING",
     early_exit: bool = False,
 ) -> Tuple[int, List[Dict], List[Dict]]:
     results = []
     failed_cases = []
     return_code = 0
-    filtered_cases = [
-        bench_case for bench_case in bench_cases if bench_case_filter(bench_case, filters)
-    ]
-    if len(filtered_cases) != len(bench_cases):
-        logger.info(
-            "Filtering reduced number of cases from "
-            f"{len(bench_cases)} to {len(filtered_cases)}."
-        )
 
-    bench_cases_with_pbar = tqdm(filtered_cases)
+    bench_cases_with_pbar = tqdm(bench_cases)
     for bench_case in bench_cases_with_pbar:
         bench_cases_with_pbar.set_description(
             custom_format(
@@ -178,7 +168,6 @@ def save_results(
 
 def orchestrate_benchmarks(
     bench_cases: List[BenchCase],
-    filters: List[BenchCase],
     args,
 ) -> int:
     if args.log_level is not None:
@@ -201,7 +190,6 @@ def orchestrate_benchmarks(
 
     return_code, result, failed_cases = call_benchmarks(
         bench_cases,
-        filters,
         args.bench_log_level,
         args.exit_on_error,
     )
