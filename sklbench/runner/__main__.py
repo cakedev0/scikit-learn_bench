@@ -1,18 +1,17 @@
 import argparse
 import json
+import sys
+import timeit
 from pathlib import Path
 from typing import Any, Dict, Tuple
-import sys
 
 import numpy as np
-import timeit
 
-from ..config import BenchCase, Bench
+from ..config import Bench, BenchCase
 from ..datasets import load_data
 from ..datasets.transformer import split_and_transform_data
 from ..utils.logger import logger
-
-from .estimator import estimator_to_task, get_estimator, get_context
+from .estimator import estimator_to_task, get_context, get_estimator
 from .measurement import measure_perf
 from .metrics import get_subset_metrics_of_estimator
 
@@ -109,7 +108,9 @@ def run_case_once(
     times = {}
     execution_metrics = {}
     for method, method_metrics in raw_metrics.items():
-        times[method], execution_metrics[method] = _split_time_and_metrics(method_metrics)
+        times[method], execution_metrics[method] = _split_time_and_metrics(
+            method_metrics
+        )
 
     quality_metrics = {
         "fit": get_subset_metrics_of_estimator(
@@ -139,14 +140,13 @@ def run_case_once(
 
 
 def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
-    bench_case_dict = bench_case.model_dump(mode="json", exclude_none=True)
     library_name = bench_case.implementation.library
     estimator_name = bench_case.algorithm.estimator
     estimator_class = get_estimator(library_name, estimator_name)
 
-    raw_data, data_description = load_data(bench_case_dict)
+    raw_data, data_description = load_data(bench_case)
     data, data_description = split_and_transform_data(
-        bench_case_dict, raw_data, data_description
+        bench_case, raw_data, data_description
     )
     data = tuple(data)
     estimator_params = dict(bench_case.algorithm.estimator_params)
@@ -154,9 +154,13 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     if n_runs is None:
         n_runs = 10
 
-    time_limit = bench_case.bench.time_limit if bench_case.bench.time_limit is not None else 600
+    time_limit = (
+        bench_case.bench.time_limit if bench_case.bench.time_limit is not None else 600
+    )
 
-    with output_jsonl.open("w", encoding="utf-8") as fp, get_context(bench_case.implementation):
+    with output_jsonl.open("w", encoding="utf-8") as fp, get_context(
+        bench_case.implementation
+    ):
         t0 = timeit.default_timer()
         for repeat in range(n_runs):
             row = run_case_once(
@@ -173,7 +177,7 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
                 break
 
 
-if __name__ == "__main__":
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="python -m sklbench.runner")
     parser.add_argument("--case-file", required=True, type=Path)
     parser.add_argument("--output-jsonl", required=True, type=Path)
@@ -184,10 +188,17 @@ if __name__ == "__main__":
         choices=("ERROR", "WARNING", "INFO", "DEBUG"),
         help="Logging level for benchmark runner",
     )
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+def main() -> int:
+    args = parse_args()
     logger.setLevel(args.log_level)
     with args.case_file.open("r", encoding="utf-8") as fp:
         bench_case = BenchCase.model_validate(json.load(fp))
     run_case_to_jsonl(bench_case, args.output_jsonl)
-    sys.exit(0)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

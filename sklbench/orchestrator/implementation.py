@@ -7,11 +7,10 @@ from typing import Dict, List, Tuple
 from psutil import cpu_count
 from tqdm import tqdm
 
+from ..config import BenchCase
 from ..datasets import load_data_with_cleanup
 from ..common.filtering import bench_case_filter
-from ..utils.bench_case import get_bench_case_name, get_data_name
 from ..utils.common import custom_format, hash_from_json_repr
-from ..utils.custom_types import BenchCase
 from ..utils.logger import logger
 from .commands import run_runner_from_case
 from .env import get_environment_info
@@ -104,7 +103,7 @@ def call_benchmarks(
     for bench_case in bench_cases_with_pbar:
         bench_cases_with_pbar.set_description(
             custom_format(
-                get_bench_case_name(bench_case, shortened=True), bcolor="HEADER"
+                bench_case.name(shortened=True), bcolor="HEADER"
             )
         )
         try:
@@ -117,7 +116,9 @@ def call_benchmarks(
                     failed_cases.append(failed_case)
                 if early_exit:
                     break
-            results.append({"case": bench_case, **aggregate_runner_rows(rows)})
+            results.append(
+                {"case": bench_case.json_dict(), **aggregate_runner_rows(rows)}
+            )
         except KeyboardInterrupt:
             return_code = -1
             break
@@ -125,7 +126,7 @@ def call_benchmarks(
             return_code = -1
             failed_cases.append(
                 {
-                    "case": bench_case,
+                    "case": bench_case.json_dict(),
                     "return_code": return_code,
                     "error": repr(exc),
                     "logs": {"stdout": "", "stderr": str(exc)},
@@ -138,7 +139,7 @@ def call_benchmarks(
 
 
 def save_results(
-    bench_cases: List[Dict],
+    benchmark_results: List[Dict],
     failed_cases: List[Dict],
     hardware_hash: str,
     software_hash: str,
@@ -165,7 +166,7 @@ def save_results(
     result = {
         "hardware_hash": hardware_hash,
         "software_hash": software_hash,
-        "bench_cases": bench_cases,
+        "bench_cases": benchmark_results,
         "failed_cases": failed_cases,
     }
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -190,7 +191,7 @@ def orchestrate_benchmarks(
     software_hash = get_software_hash(env_info["software"])
 
     if args.prefetch_datasets:
-        dataset_cases = {get_data_name(case): case for case in bench_cases}
+        dataset_cases = {case.data.name(): case for case in bench_cases}
         n_datasets = len(dataset_cases)
         logger.debug(f"Unique dataset names to load:\n{list(dataset_cases.keys())}")
         n_proc = min([16, cpu_count(), n_datasets])

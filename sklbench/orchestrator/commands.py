@@ -6,14 +6,8 @@ from pathlib import Path
 from time import time
 from typing import Dict, List, Optional, Tuple
 
-from ..utils.bench_case import get_bench_case_name
+from ..config import BenchCase
 from ..utils.common import hash_from_json_repr
-from ..utils.custom_types import BenchCase
-
-
-def _section(bench_case: BenchCase, name: str) -> Dict:
-    section = bench_case.get(name, {})
-    return section if isinstance(section, dict) else {}
 
 
 def generate_runner_command(
@@ -22,35 +16,33 @@ def generate_runner_command(
     output_jsonl: Path,
     log_level: str,
 ) -> List[str]:
-    bench = _section(bench_case, "bench")
     command_prefix: List[str] = []
-    taskset = bench.get("taskset")
-    if taskset is not None:
-        command_prefix.extend(["taskset", "-c", str(taskset)])
+    if bench_case.bench.taskset is not None:
+        command_prefix.extend(["taskset", "-c", str(bench_case.bench.taskset)])
 
-    distribution = bench.get("distributor")
-    if distribution == "mpi":
-        mpi_params = bench.get("mpi_params", {})
+    if bench_case.bench.distributor == "mpi":
+        mpi_params = bench_case.bench.mpi_params or {}
         mpi_prefix = ["mpirun"]
         for mpi_param_name, mpi_param_value in mpi_params.items():
             mpi_prefix.extend([f"-{mpi_param_name}", str(mpi_param_value)])
         command_prefix = mpi_prefix + command_prefix
 
-    vtune_profiling = bench.get("vtune_profiling")
-    if vtune_profiling is not None and sys.platform == "linux":
-        vtune_result_dir = Path(bench.get("vtune_results_directory", "_vtune_results"))
+    if bench_case.bench.vtune_profiling is not None and sys.platform == "linux":
+        vtune_result_dir = Path(
+            bench_case.bench.vtune_results_directory or "_vtune_results"
+        )
         vtune_result_dir.mkdir(parents=True, exist_ok=True)
         vtune_result_path = vtune_result_dir / "_".join(
             [
-                get_bench_case_name(bench_case, shortened=True, separator="_"),
-                hash_from_json_repr(bench_case),
+                bench_case.name(shortened=True, separator="_"),
+                hash_from_json_repr(bench_case.json_dict()),
                 str(int(time() * 1000)),
             ]
         )
         command_prefix = [
             "vtune",
             "-collect",
-            str(vtune_profiling),
+            str(bench_case.bench.vtune_profiling),
             "-r",
             str(vtune_result_path),
             "-start-paused",
@@ -86,14 +78,15 @@ def parse_runner_jsonl(output_jsonl: Path) -> List[Dict]:
 def run_runner_from_case(
     bench_case: BenchCase, log_level: str
 ) -> Tuple[int, List[Dict], Optional[Dict]]:
-    bench_time_limit = _section(bench_case, "bench").get("time_limit") or 3600
+    bench_case_dict = bench_case.json_dict()
+    bench_time_limit = bench_case.bench.time_limit or 3600
     command_timeout = bench_time_limit * 1.5 + 10
     with tempfile.TemporaryDirectory(prefix="sklbench-run-") as tmp_dir:
         tmp_path = Path(tmp_dir)
         case_file = tmp_path / "case.json"
         output_jsonl = tmp_path / "result.jsonl"
         with case_file.open("w", encoding="utf-8") as fp:
-            json.dump(bench_case, fp)
+            json.dump(bench_case_dict, fp)
 
         command = generate_runner_command(
             bench_case, case_file, output_jsonl, log_level
@@ -121,7 +114,7 @@ def run_runner_from_case(
         failed_case = None
         if return_code != 0:
             failed_case = {
-                "case": bench_case,
+                "case": bench_case_dict,
                 "return_code": return_code,
                 "command": command,
                 "logs": logs,

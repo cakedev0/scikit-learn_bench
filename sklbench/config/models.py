@@ -14,7 +14,7 @@ JsonDict = dict[str, Any]
 
 
 class _Section(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
 
 class Bench(_Section):
@@ -40,11 +40,40 @@ class Data(_Section):
     source: str | None = None
     dataset: str | None = None
     id: int | str | None = None
+    cache_directory: str | None = None
+    raw_cache_directory: str | None = None
     generation_kwargs: JsonDict = Field(default_factory=dict)
     dataset_kwargs: JsonDict = Field(default_factory=dict)
     split_kwargs: JsonDict = Field(default_factory=dict)
     preprocessing_kwargs: JsonDict = Field(default_factory=dict)
     order: str | None = None
+    dtype: str | None = None
+    x_train: JsonDict | None = None
+    x_test: JsonDict | None = None
+    y_train: JsonDict | None = None
+    y_test: JsonDict | None = None
+
+    def name(self, shortened: bool = False) -> str:
+        if self.dataset is not None:
+            return self.dataset
+
+        source = self.source
+        generation_postfix = "".join(
+            f"_{key}_{value}" for key, value in self.generation_kwargs.items()
+        )
+        dataset_postfix = "".join(
+            f"_{key}_{value}" for key, value in self.dataset_kwargs.items()
+        )
+
+        if source == "fetch_openml":
+            return f"openml_{self.id}"
+        if source is not None and source.startswith("make_"):
+            if shortened:
+                return source.replace("classification", "clsf").replace(
+                    "regression", "regr"
+                )
+            return f"{source}{generation_postfix}{dataset_postfix}"
+        raise ValueError("Unable to get data name")
 
 
 class Implementation(_Section):
@@ -63,6 +92,19 @@ class BenchCase(BaseModel):
     data: Data
     implementation: Implementation
 
+    def json_dict(self) -> JsonDict:
+        return self.model_dump(mode="json", exclude_none=True)
+
+    def name(self, shortened: bool = False, separator: str = " ") -> str:
+        name_args = [
+            self.implementation.library,
+            self.algorithm.estimator,
+            self.data.name(shortened=shortened),
+        ]
+        if self.implementation.device is not None:
+            name_args.append(self.implementation.device)
+        return separator.join(name_args)
+
 
 def _json_normalize(value: Any, context: str) -> Any:
     try:
@@ -71,13 +113,7 @@ def _json_normalize(value: Any, context: str) -> Any:
         raise ValueError(f"{context} must be JSON serializable: {exc}") from exc
 
 
-def validate_case(case: dict) -> dict:
-    """Validate and normalize one benchmark case.
-
-    The returned value contains only JSON-serializable Python objects and omits
-    fields whose value is ``None``.
-    """
-
+def validate_case(case: dict) -> BenchCase:
     if not isinstance(case, dict):
         raise TypeError(f"case must be a dict, got {type(case).__name__}")
     normalized_input = _json_normalize(case, "case")
@@ -86,8 +122,7 @@ def validate_case(case: dict) -> dict:
     except ValidationError as exc:
         raise ValueError(str(exc)) from exc
 
-    normalized = validated.model_dump(mode="json", exclude_none=True)
-    return normalized
+    return validated
 
 
 def _load_module_from_path(path: Path) -> ModuleType:
@@ -110,7 +145,7 @@ def _load_module_from_path(path: Path) -> ModuleType:
     return module
 
 
-def load_cases_from_script(path: str | Path) -> list[dict]:
+def load_cases_from_script(path: str | Path) -> list[BenchCase]:
     config_path = Path(path)
     if not config_path.is_file():
         raise FileNotFoundError(f"Config script not found: {config_path}")

@@ -28,8 +28,6 @@ JsonTypesUnion = Union[Scalar, List, Dict]
 ModuleContentMap = Dict[str, List[Any]]
 # template may contain lists on first level
 BenchTemplate = Dict[str, Any]
-# case is expected to be nested dict
-BenchCase = Dict[str, Dict[str, Any]]
 
 BenchResult = Dict[str, Union[Scalar, List]]
 

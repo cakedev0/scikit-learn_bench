@@ -22,7 +22,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from sklearn.model_selection import train_test_split
 
-from ..utils.bench_case import get_bench_case_value
+from ..config import BenchCase
 from ..utils.logger import logger
 
 
@@ -128,12 +128,13 @@ def train_test_split_wrapper(*args, **kwargs):
         return train_test_split(*args, **kwargs)
 
 
-def split_and_transform_data(bench_case, data, data_description):
+def split_and_transform_data(bench_case: BenchCase, data, data_description):
+    data_params = bench_case.data
     if "default_split" in data_description:
         split_kwargs = data_description["default_split"].copy()
     else:
         split_kwargs = {"random_state": 42}
-    split_kwargs.update(get_bench_case_value(bench_case, "data:split_kwargs", dict()))
+    split_kwargs.update(data_params.split_kwargs)
     x = data["x"]
     if "y" in data:
         y = data["y"]
@@ -142,38 +143,10 @@ def split_and_transform_data(bench_case, data, data_description):
         x_train, x_test = train_test_split_wrapper(x, **split_kwargs)
         y_train, y_test = None, None
 
-    distributed_split = get_bench_case_value(bench_case, "data:distributed_split", None)
-    if distributed_split == "rank_based":
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
-
-        n_train = len(x_train)
-        n_test = len(x_test)
-
-        train_start = rank * n_train // size
-        train_end = (1 + rank) * n_train // size
-        test_start = rank * n_test // size
-        test_end = (1 + rank) * n_test // size
-
-        if "y" in data:
-            x_train, y_train = (
-                x_train[train_start:train_end],
-                y_train[train_start:train_end],
-            )
-            x_test, y_test = x_test[test_start:test_end], y_test[test_start:test_end]
-        else:
-            x_train = x_train[train_start:train_end]
-            x_test = x_test[test_start:test_end]
-
-    device = get_bench_case_value(bench_case, "implementation:device", None)
-    common_data_format = get_bench_case_value(
-        bench_case, "implementation:data_library", "pandas"
-    )
-    common_data_order = get_bench_case_value(bench_case, "data:order", "F")
-    common_data_dtype = get_bench_case_value(bench_case, "data:dtype", "float32")
+    device = bench_case.implementation.device
+    common_data_format = bench_case.implementation.data_library or "pandas"
+    common_data_order = data_params.order or "F"
+    common_data_dtype = data_params.dtype or "float32"
 
     data_dict = {
         "x_train": x_train,
@@ -192,15 +165,10 @@ def split_and_transform_data(bench_case, data, data_description):
             continue
         is_label = subset_name.startswith("y")
 
-        data_format = get_bench_case_value(
-            bench_case, f"data:{subset_name}:format", common_data_format
-        )
-        data_order = get_bench_case_value(
-            bench_case, f"data:{subset_name}:order", common_data_order
-        )
-        data_dtype = get_bench_case_value(
-            bench_case, f"data:{subset_name}:dtype", common_data_dtype
-        )
+        subset_options = getattr(data_params, subset_name) or {}
+        data_format = subset_options.get("format", common_data_format)
+        data_order = subset_options.get("order", common_data_order)
+        data_dtype = subset_options.get("dtype", common_data_dtype)
 
         if is_label and required_label_dtype is not None:
             data_dtype = required_label_dtype
