@@ -12,9 +12,9 @@ from ..common.filtering import bench_case_filter
 from ..utils.bench_case import get_bench_case_name, get_data_name
 from ..utils.common import custom_format, hash_from_json_repr
 from ..utils.custom_types import BenchCase
-from ..utils.env import get_environment_info
 from ..utils.logger import logger
 from .commands import run_runner_from_case
+from .env import get_environment_info
 
 
 def get_hardware_hash(hardware_info: Dict) -> str:

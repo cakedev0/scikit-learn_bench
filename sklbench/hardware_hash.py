@@ -16,8 +16,8 @@
 
 import sys
 
-from sklbench.runner.implementation import get_hardware_hash
-from sklbench.utils.env import get_hardware_info
+from sklbench.orchestrator.env import get_hardware_info
+from sklbench.orchestrator.implementation import get_hardware_hash
 
 
 def main():

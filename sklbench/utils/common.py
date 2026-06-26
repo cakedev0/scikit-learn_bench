@@ -19,11 +19,10 @@ import importlib
 import inspect
 import json
 import re
-import subprocess as sp
 import warnings
 from pprint import pformat
 from shutil import get_terminal_size
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 
@@ -57,31 +56,6 @@ def custom_format(
     if bcolor is not None:
         output = BCOLORS[bcolor] + str(input_obj) + BCOLORS["ENDC"]
     return output
-
-
-def read_output_from_command(
-    command: str, timeout: Optional[float] = None
-) -> Tuple[int, str, str]:
-    """Executes command and returns code, stdout and stderr"""
-    try:
-        res = sp.run(
-            command.split(" "),
-            stdout=sp.PIPE,
-            stderr=sp.PIPE,
-            encoding="utf-8",
-            timeout=timeout,
-        )
-    except sp.TimeoutExpired as exc:
-        stdout = exc.stdout or ""
-        stderr = exc.stderr or ""
-        timeout_message = f"Command timed out after {timeout} seconds."
-        stderr = f"{stderr.strip()}\n{timeout_message}".strip()
-        return -9, stdout.strip(), stderr
-    return (
-        res.returncode,
-        res.stdout.strip(),
-        res.stderr.strip(),
-    )
 
 
 def hash_from_json_repr(x: JsonTypesUnion, hash_limit: int = 5) -> str:
@@ -191,52 +165,3 @@ def get_module_members(
             functions_map = merge_maps(functions_map, sub_functions_map)
 
     return classes_map, functions_map
-
-
-def is_float(value: str) -> bool:
-    return (
-        re.match(
-            r"^[-+]?(?:\b[0-9]+(?:\.[0-9]*)?|\.[0-9]+\b)(?:[eE][-+]?[0-9]+\b)?$", value
-        )
-        is not None
-    )
-
-
-def convert_to_numeric_if_possible(value: str) -> Union[Numeric, str]:
-    if value.isdigit():
-        return int(value)
-    elif is_float(value):
-        return float(value)
-    else:
-        return value
-
-
-def convert_to_numpy(a, dp_compat=False) -> np.ndarray:
-    if dp_compat and ("dpctl" in str(type(a)) or "dpnp" in str(type(a))):
-        return a
-    if isinstance(a, np.ndarray):
-        return a
-    elif hasattr(a, "to_numpy"):
-        return a.to_numpy()
-    elif hasattr(a, "asnumpy"):
-        return a.asnumpy()
-    elif "dpnp" in str(type(a)):
-        import dpnp
-
-        return dpnp.asnumpy(a)
-    elif "dpctl" in str(type(a)):
-        warnings.warn(
-            "dpctl tensors are deprecated and support for them "
-            "in scikit-learn_bench will be removed. "
-            "Consider using dpnp arrays instead.",
-            FutureWarning,
-        )
-        import dpctl.tensor
-
-        return dpctl.tensor.to_numpy(a)
-    elif "torch.Tensor" in str(type(a)):
-        return a.detach().cpu().numpy()
-    elif "cupy.ndarray" in str(type(a)):
-        return a.get()
-    else:
-        raise ValueError("Unable to convert data to numpy.ndarray")

@@ -1,15 +1,16 @@
 import gc
+import subprocess
+import sys
 import threading
 import timeit
 from math import ceil, sqrt
 from time import sleep
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import psutil
 from cpuinfo import get_cpu_info
 
-from ..utils.env import get_number_of_sockets
 from ..utils.logger import logger
 
 try:
@@ -38,8 +39,52 @@ def _get_n_from_cache_size():
         cache_size += cpu_info["l3_cache_size"]
     if "l2_cache_size" in cpu_info:
         cache_size += cpu_info["l2_cache_size"] * psutil.cpu_count(logical=False)
-    n_sockets = get_number_of_sockets()
+    n_sockets = _get_number_of_sockets()
     return ceil(sqrt(n_sockets * cache_size / 8))
+
+
+def read_output_from_command(
+    command: str, timeout: Optional[float] = None
+) -> Tuple[int, str, str]:
+    try:
+        res = subprocess.run(
+            command.split(" "),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout or ""
+        stderr = exc.stderr or ""
+        timeout_message = f"Command timed out after {timeout} seconds."
+        stderr = f"{stderr.strip()}\n{timeout_message}".strip()
+        return -9, stdout.strip(), stderr
+    return res.returncode, res.stdout.strip(), res.stderr.strip()
+
+
+def _get_number_of_sockets():
+    if sys.platform == "win32":
+        try:
+            result = subprocess.check_output(
+                ["wmic", "cpu", "get", "DeviceID"], shell=False, text=True
+            )
+            return len([line for line in result.split("\n") if line.startswith("CPU")])
+        except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
+            logger.warning("Unable to get number of sockets via wmic")
+            return 1
+    if sys.platform == "linux":
+        try:
+            _, lscpu_text, _ = read_output_from_command("lscpu")
+            for line in lscpu_text.split("\n"):
+                if "Socket(s):" in line:
+                    return int(line.split(":")[1].strip())
+            logger.warning("Unable to find Socket(s) information in lscpu output")
+        except (FileNotFoundError, ValueError, IndexError):
+            logger.warning("Unable to get number of sockets via lscpu")
+        return 1
+    logger.warning("Unable to get number of sockets due to unknown sys.platform")
+    return 1
 
 
 def _flush_cache(n: int | None = None):
