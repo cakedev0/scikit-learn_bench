@@ -24,7 +24,6 @@ from ..utils.common import get_module_members
 from ..common.filtering import bench_case_filter
 from ..utils.custom_types import BenchCase
 from ..utils.logger import logger
-from ..utils.measurement import measure_case
 from ..utils.special_params import assign_case_special_values_on_run
 from .common import main_template, time_and_metrics
 

@@ -77,7 +77,6 @@ def generate_cases():
             "algorithm": {
                 "estimator": "RandomForestClassifier",
                 "estimator_params": {"n_estimators": 16, "random_state": 42},
-                "estimator_methods": {"inference": "predict"},
             },
             "data": {
                 "source": "make_classification",

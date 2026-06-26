@@ -46,7 +46,6 @@ from ..utils.common import convert_to_numpy, custom_format, get_module_members
 from ..common.filtering import bench_case_filter
 from ..utils.custom_types import BenchCase, Numeric, NumpyNumeric
 from ..utils.logger import logger
-from ..utils.measurement import measure_case
 from ..utils.special_params import assign_case_special_values_on_run
 from .common import main_template, time_and_metrics
 
@@ -102,17 +101,6 @@ def estimator_to_task(estimator_name: str) -> str:
     return "unknown"
 
 
-def get_number_of_classes(estimator_instance, y):
-    classes = getattr(estimator_instance, "classes_", None)
-    class_weight = getattr(estimator_instance, "_class_weight", None)
-    if classes is not None and hasattr(classes, "__len__"):
-        return len(classes)
-    elif class_weight is not None and hasattr(class_weight, "__len__"):
-        return len(class_weight)
-    else:
-        return len(np.unique(convert_to_numpy(y)))
-
-
 def get_subset_metrics_of_estimator(
     task, stage, estimator_instance, data
 ) -> Dict[str, float]:
@@ -125,17 +113,6 @@ def get_subset_metrics_of_estimator(
     # and `x_compat` and `y_compat` for compatibility with sklearn metrics
     x, y = data
     x_compat, y_compat = list(map(lambda i: convert_to_numpy(i), data))
-    if stage == "training":
-        if hasattr(estimator_instance, "n_iter_"):
-            iterations = estimator_instance.n_iter_
-            if isinstance(iterations, Union[Numeric, NumpyNumeric].__args__):
-                metrics.update({"iterations": int(iterations)})
-            elif (
-                hasattr(iterations, "__len__")
-                and len(iterations) == 1
-                and isinstance(iterations[0], Union[Numeric, NumpyNumeric].__args__)
-            ):
-                metrics.update({"iterations": int(iterations[0])})
     if task == "classification":
         y_pred = convert_to_numpy(estimator_instance.predict(x))
         metrics.update(

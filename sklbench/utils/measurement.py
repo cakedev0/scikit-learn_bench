@@ -177,14 +177,12 @@ def measure_perf(
     n_runs: int,
     time_limit: float,
     enable_itt: bool,
-    collect_return_values: bool = False,
     enable_cache_flushing: bool,
     enable_garbage_collection: bool,
     enable_cpu_profiling: bool,
     enable_memory_profiling: bool,
     enable_nvml_profiling: bool = False,
     memory_profiling_interval: float = 0.001,
-    cost_per_hour: float = 0.0,
     **kwargs,
 ):
     if enable_itt and not itt_is_available:
@@ -194,8 +192,6 @@ def measure_perf(
         )
         enable_itt = False
     times = list()
-    if collect_return_values:
-        func_return_values = list()
     if enable_cpu_profiling:
         cpu_loads = list()
     if enable_memory_profiling:
@@ -226,7 +222,7 @@ def measure_perf(
             # start cpu profiling interval by using `None` value
             psutil.cpu_percent(interval=None)
         t0 = timeit.default_timer()
-        func_return_value = func(*args, **kwargs)
+        _ = func(*args, **kwargs)
         t1 = timeit.default_timer()
         if enable_cpu_profiling:
             cpu_loads.append(psutil.cpu_percent(interval=None))
@@ -236,8 +232,6 @@ def measure_perf(
             memory_peaks["RAM"].append(max(memory_profiles["RAM"]))
             if enable_nvml_profiling:
                 memory_peaks["VRAM"].append(max(memory_profiles["VRAM"]))
-        if collect_return_values:
-            func_return_values.append(func_return_value)
         if enable_itt:
             itt.pause()
         times.append((t1 - t0))
@@ -261,39 +255,5 @@ def measure_perf(
             )
     if enable_cpu_profiling:
         perf_metrics["cpu load[%]"] = cpu_loads
-    if cost_per_hour > 0.0:
-        perf_metrics["cost[microdollar]"] = list(
-            map(lambda x: x / 1000 / 3600 * cost_per_hour * 1e6, perf_metrics["time[ms]"])
-        )
-    if collect_return_values:
-        return perf_metrics, func_return_values
-    else:
-        return perf_metrics
 
-
-# wrapper to get measurement params from benchmarking case
-def measure_case(case: BenchCase, func, *args, **kwargs):
-    distirbutor = get_bench_case_value(case, "bench:distributor")
-    if distirbutor == "mpi":
-        # sync all MPI processes
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-        comm.Barrier()
-    return measure_perf(
-        func,
-        *args,
-        **kwargs,
-        n_runs=get_bench_case_value(case, "bench:n_runs", 10),
-        time_limit=get_bench_case_value(case, "bench:time_limit", 3600),
-        enable_itt=get_bench_case_value(case, "bench:vtune_profiling") is not None,
-        enable_cache_flushing=get_bench_case_value(case, "bench:flush_cache", False),
-        enable_garbage_collection=get_bench_case_value(case, "bench:gc_collect", False),
-        enable_cpu_profiling=get_bench_case_value(case, "bench:cpu_profile", False),
-        enable_memory_profiling=get_bench_case_value(case, "bench:memory_profile", False),
-        enable_nvml_profiling=(
-            get_bench_case_value(case, "implementation:library") == "cuml"
-            and nvml_is_available
-        ),
-        cost_per_hour=get_bench_case_value(case, "bench:cost_per_hour", 0.0),
-    )
+    return perf_metrics

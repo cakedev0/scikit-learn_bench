@@ -36,9 +36,6 @@ class Algorithm(_Section):
     estimator: str | None = None
     function: str | None = None
     estimator_params: JsonDict = Field(default_factory=dict)
-    estimator_methods: JsonDict | None = None
-    batch_size: JsonDict | None = None
-    enable_modelbuilders: bool | None = None
 
 
 class Data(_Section):
