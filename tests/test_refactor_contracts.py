@@ -5,10 +5,16 @@ import pytest
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LinearRegression
 
-from reporting.matching import _iter_results_from_bench_case
+from reporting.matching import (
+    BenchmarkRecord,
+    Match,
+    append_iterations_warning,
+    method_results_from_records,
+    read_benchmark_records,
+)
 from sklbench.config import load_cases_from_script, validate_case
 from sklbench.orchestrator import implementation
-from sklbench.runner.__main__ import estimator_params_for_repeat
+from sklbench.runner.__main__ import _as_jsonable, estimator_params_for_repeat
 
 
 def minimal_case(**overrides):
@@ -183,52 +189,236 @@ def test_orchestrator_stores_runner_jsonl_rows(monkeypatch):
     ]
 
 
-def test_reporting_reads_raw_runner_results():
-    bench_case = {
-        "case": validate_case(minimal_case()).json_dict(),
-        "results": [
-            {
-                "data_desc": {"fit": {"samples": 4}, "predict": {"samples": 2}},
-                "time_ms": {"fit": 1.0, "predict": 0.5},
-                "metrics": {
-                    "fit": {"R2": 1.0},
-                    "predict": {"R2": 0.5},
-                },
-                "profiling_metrics": {"fit": {"cpu load[%]": [10]}},
-                "attributes": {"n_iter": 2},
-                "logs": {"stdout": "", "stderr": ""},
-            },
-            {
-                "data_desc": {"fit": {"samples": 4}, "predict": {"samples": 2}},
-                "time_ms": {"fit": 1.5, "predict": 0.75},
-                "metrics": {
-                    "fit": {"R2": 1.0},
-                    "predict": {"R2": 0.5},
-                },
-                "profiling_metrics": {"fit": {"cpu load[%]": [20]}},
-                "attributes": {"n_iter": 2},
-                "logs": {"stdout": "", "stderr": ""},
-            },
-        ],
+def test_runner_serializes_small_array_like_attributes():
+    class ArrayLike:
+        shape = (1,)
+        dtype = "torch.int32"
+
+        def tolist(self):
+            return [19]
+
+    assert _as_jsonable(ArrayLike()) == 19
+
+
+def test_runner_serializes_large_array_like_attributes_as_metadata():
+    class ArrayLike:
+        shape = (17,)
+        dtype = "torch.float64"
+
+        def tolist(self):
+            raise AssertionError("large arrays should not be materialized")
+
+    assert _as_jsonable(ArrayLike()) == {"shape": [17], "dtype": "torch.float64"}
+
+
+def make_record(runs):
+    case = validate_case(minimal_case()).json_dict()
+    case.pop("bench", None)
+    return BenchmarkRecord(
+        hardware_hash="hardware",
+        software_hash="software",
+        timestamp_recorded=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        case=case,
+        runs=runs,
+    )
+
+
+def make_run(
+    *,
+    fit_time=1.0,
+    predict_time=0.5,
+    fit_metric=1.0,
+    predict_metric=0.5,
+    data_desc=None,
+    attributes=None,
+    logs=None,
+    profiling_metrics=None,
+):
+    return {
+        "data_desc": data_desc
+        or {"fit": {"samples": 4}, "predict": {"samples": 2}},
+        "time_ms": {"fit": fit_time, "predict": predict_time},
+        "metrics": {
+            "fit": {"R2": fit_metric},
+            "predict": {"R2": predict_metric},
+        },
+        "profiling_metrics": profiling_metrics or {"fit": {"cpu load[%]": [10]}},
+        "attributes": attributes or {},
+        "logs": logs or {"stdout": "", "stderr": ""},
     }
 
-    results = list(
-        _iter_results_from_bench_case(
-            bench_case=bench_case,
-            hardware_hash="hardware",
-            software_hash="software",
-            timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
-        )
+
+def test_read_benchmark_records_reads_raw_results(tmp_path):
+    result_path = tmp_path / "20260101T010203000004Z.json"
+    case = validate_case(minimal_case()).json_dict()
+    result_path.write_text(
+        json.dumps(
+            {
+                "hardware_hash": "hardware",
+                "software_hash": "software",
+                "bench_cases": [{"case": case, "results": [make_run()]}],
+                "failed_cases": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    records = read_benchmark_records(tmp_path)
+    expected_case = validate_case(minimal_case()).json_dict()
+    expected_case.pop("bench", None)
+
+    assert len(records) == 1
+    assert records[0].case == expected_case
+    assert records[0].runs == [make_run()]
+
+
+def test_reporting_reads_raw_runner_results():
+    results = method_results_from_records(
+        [
+            make_record(
+                [
+                    make_run(
+                        fit_time=1.0,
+                        predict_time=0.5,
+                        attributes={"n_iter": 2},
+                    ),
+                    make_run(
+                        fit_time=1.5,
+                        predict_time=0.75,
+                        attributes={"n_iter": 2},
+                    ),
+                ]
+            )
+        ]
     )
 
     fit_result = next(result for result in results if result.method == "fit")
     predict_result = next(result for result in results if result.method == "predict")
 
     assert fit_result.times == [1.0, 1.5]
-    assert fit_result.metrics["fit"]["cpu load[%]"] == [10, 20]
-    assert fit_result.attributes == {"n_iter": 2}
+    assert fit_result.metric_samples["fit"]["R2"] == [1.0, 1.0]
+    assert fit_result.metrics["fit"]["R2"] == 1.0
+    assert "cpu load[%]" not in fit_result.metrics["fit"]
+    assert fit_result.attributes == {"iterations": [2]}
     assert predict_result.times == [0.5, 0.75]
     assert predict_result.data_desc == {"samples": 2}
+
+
+def test_reporting_rejects_data_desc_drift_across_repeats():
+    record = make_record(
+        [
+            make_run(data_desc={"fit": {"samples": 4}, "predict": {"samples": 2}}),
+            make_run(data_desc={"fit": {"samples": 5}, "predict": {"samples": 2}}),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="Inconsistent data_desc"):
+        method_results_from_records([record])
+
+
+def test_reporting_preserves_first_non_empty_logs():
+    results = method_results_from_records(
+        [
+            make_record(
+                [
+                    make_run(logs={"stdout": "", "stderr": ""}),
+                    make_run(logs={"stdout": "", "stderr": "warning"}),
+                    make_run(logs={"stdout": "later", "stderr": ""}),
+                ]
+            )
+        ]
+    )
+
+    assert results[0].logs == {"stdout": "", "stderr": "warning"}
+
+
+def test_metric_matching_uses_baseline_variability_and_candidate_mean():
+    base_result = next(
+        result
+        for result in method_results_from_records(
+            [
+                make_record(
+                    [
+                        make_run(fit_metric=1.0),
+                        make_run(fit_metric=1.0),
+                        make_run(fit_metric=1.0),
+                    ]
+                )
+            ]
+        )
+        if result.method == "fit"
+    )
+    candidate_result = next(
+        result
+        for result in method_results_from_records(
+            [
+                make_record(
+                    [
+                        make_run(fit_metric=1.0),
+                        make_run(fit_metric=1.0),
+                        make_run(fit_metric=1.2),
+                    ]
+                )
+            ]
+        )
+        if result.method == "fit"
+    )
+
+    match = Match(base_result, candidate_result, warnings=[])
+
+    assert match.metrics_differences
+    assert "target_mean" in match.metrics_differences[0]
+
+
+def test_metric_matching_uses_three_sigma_tolerance_floor():
+    base_result = next(
+        result
+        for result in method_results_from_records(
+            [
+                make_record(
+                    [
+                        make_run(fit_metric=0.98),
+                        make_run(fit_metric=1.0),
+                        make_run(fit_metric=1.02),
+                    ]
+                )
+            ]
+        )
+        if result.method == "fit"
+    )
+    candidate_result = next(
+        result
+        for result in method_results_from_records(
+            [make_record([make_run(fit_metric=1.05)])]
+        )
+        if result.method == "fit"
+    )
+
+    assert Match(base_result, candidate_result, warnings=[]).metrics_match
+
+
+def test_iteration_warning_uses_selected_attributes_only():
+    base_result = next(
+        result
+        for result in method_results_from_records(
+            [make_record([make_run(attributes={"solver": "svd", "n_iter": 2})])]
+        )
+        if result.method == "fit"
+    )
+    candidate_result = next(
+        result
+        for result in method_results_from_records(
+            [make_record([make_run(attributes={"solver": "lbfgs", "n_iter": 3})])]
+        )
+        if result.method == "fit"
+    )
+    warnings = []
+
+    append_iterations_warning(base_result, candidate_result, warnings)
+
+    assert len(warnings) == 1
+    assert base_result.attributes == {"iterations": [2]}
+    assert candidate_result.attributes == {"iterations": [3]}
 
 
 def test_estimator_params_for_repeat_sets_supported_random_state():

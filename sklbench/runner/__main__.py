@@ -1,11 +1,12 @@
 import argparse
 import inspect
 import json
+import math
 import statistics
 import sys
 import timeit
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -18,13 +19,67 @@ from .measurement import measure_perf
 from .metrics import get_subset_metrics_of_estimator
 
 
+def _array_like_size(value: Any) -> Optional[int]:
+    size = getattr(value, "size", None)
+    if isinstance(size, int):
+        return size
+    if callable(size):
+        try:
+            size = size()
+        except TypeError:
+            size = None
+        if isinstance(size, int):
+            return size
+        if isinstance(size, tuple):
+            return math.prod(size)
+
+    numel = getattr(value, "numel", None)
+    if callable(numel):
+        return numel()
+
+    shape = getattr(value, "shape", None)
+    if shape is not None:
+        return math.prod(shape)
+    return None
+
+
+def _array_like_metadata(value: Any) -> Optional[dict]:
+    metadata = {}
+    shape = getattr(value, "shape", None)
+    if shape is not None:
+        metadata["shape"] = list(shape)
+    dtype = getattr(value, "dtype", None)
+    if dtype is not None:
+        metadata["dtype"] = str(dtype)
+    return metadata or None
+
+
+def _is_singleton_vector(value: Any) -> bool:
+    shape = getattr(value, "shape", None)
+    return shape is not None and tuple(shape) == (1,)
+
+
 def _as_jsonable(value: Any):
     if isinstance(value, np.generic):
         return value.item()
     if isinstance(value, np.ndarray):
+        if value.shape == (1,):
+            return _as_jsonable(value.item())
         if value.size <= 16:
             return value.tolist()
         return {"shape": list(value.shape), "dtype": str(value.dtype)}
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        size = _array_like_size(value)
+        if size is not None and size > 16:
+            return _array_like_metadata(value)
+        try:
+            jsonable_value = tolist()
+        except (TypeError, ValueError, RuntimeError):
+            return _array_like_metadata(value)
+        if _is_singleton_vector(value) and isinstance(jsonable_value, list):
+            return _as_jsonable(jsonable_value[0])
+        return _as_jsonable(jsonable_value)
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, dict):
