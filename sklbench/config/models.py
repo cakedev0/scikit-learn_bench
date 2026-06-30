@@ -18,17 +18,18 @@ class _Section(BaseModel):
 
 
 class Bench(_Section):
-    n_runs: int | None = None
-    time_limit: float | None = None
+    n_runs: int = 10
+    time_limit: float = 600
     taskset: str | int | None = None
     distributor: str | None = None
-    mpi_params: JsonDict | None = None
+    mpi_params: JsonDict = Field(default_factory=dict)
     vtune_profiling: str | None = None
-    vtune_results_directory: str | None = None
-    flush_cache: bool | None = None
-    gc_collect: bool | None = None
-    cpu_profile: bool | None = None
-    memory_profile: bool | None = None
+    vtune_results_directory: str = "_vtune_results"
+    flush_cache: bool = False
+    gc_collect: bool = False
+    cpu_profile: bool = False
+    memory_profile: bool = False
+    memory_profiling_interval: float = 0.001
 
 
 class Algorithm(_Section):
@@ -93,7 +94,7 @@ class BenchCase(BaseModel):
     implementation: Implementation
 
     def json_dict(self) -> JsonDict:
-        return self.model_dump(mode="json", exclude_none=True)
+        return self.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
 
     def name(self, shortened: bool = False, separator: str = " ") -> str:
         name_args = [

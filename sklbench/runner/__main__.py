@@ -8,7 +8,7 @@ import statistics
 
 import numpy as np
 
-from ..config import Bench, BenchCase
+from ..config import BenchCase
 from ..datasets import load_data
 from ..datasets.transformer import split_and_transform_data
 from ..utils.logger import logger
@@ -83,22 +83,6 @@ def _collect_model_attributes(estimator) -> Dict[str, Any]:
     return attributes
 
 
-def _measure_single_method(bench_params: Bench, method_instance, data_args):
-    time_limit = bench_params.time_limit if bench_params.time_limit is not None else 3600
-    return measure_perf(
-        method_instance,
-        *data_args,
-        n_runs=1,
-        time_limit=time_limit,
-        enable_itt=bench_params.vtune_profiling is not None,
-        enable_cache_flushing=bench_params.flush_cache or False,
-        enable_garbage_collection=bench_params.gc_collect or False,
-        enable_cpu_profiling=bench_params.cpu_profile or False,
-        enable_memory_profiling=bench_params.memory_profile or False,
-        enable_nvml_profiling=False,
-    )
-
-
 def _split_time_and_metrics(result: Dict) -> Tuple[float, Dict]:
     time_values = result.get("time[ms]", [])
     time_value = time_values[0] if isinstance(time_values, list) else time_values
@@ -115,25 +99,21 @@ def run_case_once(
     task = estimator_to_task(bench_case.algorithm.estimator)
     X_train, X_test, y_train, y_test = data
 
-    raw_metrics = {
-        "fit": _measure_single_method(
-            bench_case.bench,
-            estimator.fit,
-            (X_train, y_train),
-        ),
-        "predict": _measure_single_method(
-            bench_case.bench,
-            estimator.predict,
-            (X_test,),
-        ),
-    }
-
     times = {}
-    execution_metrics = {}
-    for method, method_metrics in raw_metrics.items():
-        times[method], execution_metrics[method] = _split_time_and_metrics(
-            method_metrics
-        )
+    profiling_metrics = {}
+
+    times["fit"], profiling_metrics["fit"] = measure_perf(
+        estimator.fit,
+        X_train,
+        y_train,
+        bench_params=bench_case.bench,
+    )
+
+    times["predict"], profiling_metrics["predict"] = measure_perf(
+        estimator.predict,
+        X_test,
+        bench_params=bench_case.bench,
+    )
 
     quality_metrics = {
         "fit": get_subset_metrics_of_estimator(
@@ -157,7 +137,7 @@ def run_case_once(
         "data_desc": data_desc,
         "time_ms": times,
         "metrics": quality_metrics,
-        "execution_metrics": execution_metrics,
+        "profiling_metrics": profiling_metrics,
         "attributes": _collect_model_attributes(estimator),
     }
 
@@ -174,12 +154,7 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     data = tuple(data)
     estimator_params = dict(bench_case.algorithm.estimator_params)
     n_runs = bench_case.bench.n_runs
-    if n_runs is None:
-        n_runs = 10
-
-    time_limit = (
-        bench_case.bench.time_limit if bench_case.bench.time_limit is not None else 600
-    )
+    time_limit = bench_case.bench.time_limit
 
     with output_jsonl.open("w", encoding="utf-8") as fp, get_context(
         bench_case.implementation

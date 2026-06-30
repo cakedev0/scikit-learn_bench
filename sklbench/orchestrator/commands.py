@@ -21,16 +21,13 @@ def generate_runner_command(
         command_prefix.extend(["taskset", "-c", str(bench_case.bench.taskset)])
 
     if bench_case.bench.distributor == "mpi":
-        mpi_params = bench_case.bench.mpi_params or {}
         mpi_prefix = ["mpirun"]
-        for mpi_param_name, mpi_param_value in mpi_params.items():
+        for mpi_param_name, mpi_param_value in bench_case.bench.mpi_params.items():
             mpi_prefix.extend([f"-{mpi_param_name}", str(mpi_param_value)])
         command_prefix = mpi_prefix + command_prefix
 
     if bench_case.bench.vtune_profiling is not None and sys.platform == "linux":
-        vtune_result_dir = Path(
-            bench_case.bench.vtune_results_directory or "_vtune_results"
-        )
+        vtune_result_dir = Path(bench_case.bench.vtune_results_directory)
         vtune_result_dir.mkdir(parents=True, exist_ok=True)
         vtune_result_path = vtune_result_dir / "_".join(
             [
@@ -79,7 +76,7 @@ def run_runner_from_case(
     bench_case: BenchCase, log_level: str
 ) -> Tuple[int, List[Dict], Optional[Dict]]:
     bench_case_dict = bench_case.json_dict()
-    bench_time_limit = bench_case.bench.time_limit or 3600
+    bench_time_limit = bench_case.bench.time_limit
     command_timeout = bench_time_limit * 1.5 + 10
     with tempfile.TemporaryDirectory(prefix="sklbench-run-") as tmp_dir:
         tmp_path = Path(tmp_dir)

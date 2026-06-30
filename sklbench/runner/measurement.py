@@ -11,6 +11,7 @@ import numpy as np
 import psutil
 from cpuinfo import get_cpu_info
 
+from ..config import Bench
 from ..utils.logger import logger
 
 try:
@@ -127,17 +128,17 @@ def _monitor_memory_usage(
 def measure_perf(
     func,
     *args,
-    n_runs: int,
-    time_limit: float,
-    enable_itt: bool,
-    enable_cache_flushing: bool,
-    enable_garbage_collection: bool,
-    enable_cpu_profiling: bool,
-    enable_memory_profiling: bool,
-    enable_nvml_profiling: bool = False,
-    memory_profiling_interval: float = 0.001,
+    bench_params: Bench,
     **kwargs,
 ):
+    enable_itt = bench_params.vtune_profiling is not None
+    enable_cache_flushing = bench_params.flush_cache
+    enable_garbage_collection = bench_params.gc_collect
+    enable_cpu_profiling = bench_params.cpu_profile
+    enable_memory_profiling = bench_params.memory_profile
+    memory_profiling_interval = bench_params.memory_profiling_interval
+    enable_nvml_profiling = False
+
     if enable_itt and not itt_is_available:
         logger.warning(
             "Intel(R) VTune(TM) profiling was requested "
@@ -145,7 +146,6 @@ def measure_perf(
         )
         enable_itt = False
 
-    times = []
     if enable_cpu_profiling:
         cpu_loads = []
     if enable_memory_profiling:
@@ -153,56 +153,48 @@ def measure_perf(
         if enable_nvml_profiling:
             memory_peaks["VRAM"] = []
 
-    while len(times) < n_runs:
-        if enable_cache_flushing:
-            _flush_cache()
-        if enable_itt:
-            itt.resume()
-        if enable_memory_profiling:
-            memory_profiles = {"RAM": []}
-            if enable_nvml_profiling:
-                memory_profiles["VRAM"] = []
-            profiling_stop_event = threading.Event()
-            profiling_thread = threading.Thread(
-                target=_monitor_memory_usage,
-                args=(
-                    memory_profiling_interval,
-                    memory_profiles,
-                    profiling_stop_event,
-                    enable_nvml_profiling,
-                ),
-            )
-            profiling_thread.start()
-        if enable_cpu_profiling:
-            psutil.cpu_percent(interval=None)
+    if enable_cache_flushing:
+        _flush_cache()
+    if enable_itt:
+        itt.resume()
+    if enable_memory_profiling:
+        memory_profiles = {"RAM": []}
+        if enable_nvml_profiling:
+            memory_profiles["VRAM"] = []
+        profiling_stop_event = threading.Event()
+        profiling_thread = threading.Thread(
+            target=_monitor_memory_usage,
+            args=(
+                memory_profiling_interval,
+                memory_profiles,
+                profiling_stop_event,
+                enable_nvml_profiling,
+            ),
+        )
+        profiling_thread.start()
+    if enable_cpu_profiling:
+        psutil.cpu_percent(interval=None)
 
-        t0 = timeit.default_timer()
-        _ = func(*args, **kwargs)
-        t1 = timeit.default_timer()
+    t0 = timeit.default_timer()
+    _ = func(*args, **kwargs)
+    t1 = timeit.default_timer()
 
-        if enable_cpu_profiling:
-            cpu_loads.append(psutil.cpu_percent(interval=None))
-        if enable_memory_profiling:
-            profiling_stop_event.set()
-            profiling_thread.join()
-            memory_peaks["RAM"].append(max(memory_profiles["RAM"]))
-            if enable_nvml_profiling:
-                memory_peaks["VRAM"].append(max(memory_profiles["VRAM"]))
-        if enable_itt:
-            itt.pause()
+    if enable_cpu_profiling:
+        cpu_loads.append(psutil.cpu_percent(interval=None))
+    if enable_memory_profiling:
+        profiling_stop_event.set()
+        profiling_thread.join()
+        memory_peaks["RAM"].append(max(memory_profiles["RAM"]))
+        if enable_nvml_profiling:
+            memory_peaks["VRAM"].append(max(memory_profiles["VRAM"]))
+    if enable_itt:
+        itt.pause()
 
-        times.append(t1 - t0)
-        if enable_garbage_collection:
-            gc.collect()
-        if sum(times) > time_limit:
-            logger.warning(
-                f"'{func}' function measurement time "
-                f"({sum(times)} seconds from {len(times)} runs) "
-                f"exceeded time limit ({time_limit} seconds)"
-            )
-            break
+    time_ms = 1000 * (t1 - t0)
+    if enable_garbage_collection:
+        gc.collect()
 
-    perf_metrics = {"time[ms]": [time * 1000 for time in times]}
+    perf_metrics = {}
     if enable_memory_profiling:
         perf_metrics["peak RAM usage[MB]"] = [
             memory_peak / 2**20 for memory_peak in memory_peaks["RAM"]
@@ -214,4 +206,4 @@ def measure_perf(
     if enable_cpu_profiling:
         perf_metrics["cpu load[%]"] = cpu_loads
 
-    return perf_metrics
+    return time_ms, perf_metrics
