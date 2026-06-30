@@ -1,3 +1,5 @@
+import importlib
+
 from sklearn.base import BaseEstimator
 
 from ..config.models import Implementation
@@ -31,9 +33,34 @@ def estimator_to_task(estimator_name: str) -> str:
     return "unknown"
 
 
+wrapped_estimators = {
+    (
+        "sklearn",
+        "HistGradientBoostingClassifier",
+    ): "instrumented_hgb.HistGradientBoostingClassifier",
+    (
+        "sklearn",
+        "HistGradientBoostingRegressor",
+    ): "instrumented_hgb.HistGradientBoostingRegressor",
+}
+
+
+def _get_wrapped_estimator(library_name: str, estimator_name: str):
+    wrapped_estimator = wrapped_estimators.get((library_name, estimator_name))
+    if wrapped_estimator is None:
+        return None
+
+    module_name, class_name = wrapped_estimator.rsplit(".", 1)
+    module = importlib.import_module(f".estimators.{module_name}", package=__package__)
+    return getattr(module, class_name)
+
+
 def get_estimator(library_name: str, estimator_name: str):
     # Public classes can be remapped here to wrappers when sklearn API
     # compatibility needs a small adapter.
+    estimator = _get_wrapped_estimator(library_name, estimator_name)
+    if estimator is not None:
+        return estimator
 
     classes_map, _ = get_module_members(library_name.split("."))
     if estimator_name not in classes_map:
