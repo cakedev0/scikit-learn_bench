@@ -1,10 +1,11 @@
 import argparse
+import inspect
 import json
+import statistics
 import sys
 import timeit
 from pathlib import Path
 from typing import Any, Dict, Tuple
-import statistics
 
 import numpy as np
 
@@ -134,6 +135,22 @@ def run_case_once(
     }
 
 
+def estimator_params_for_repeat(
+    estimator_class, estimator_params: Dict, repeat: int
+) -> Dict:
+    params = dict(estimator_params)
+    if "random_state" in params:
+        return params
+
+    try:
+        signature = inspect.signature(estimator_class)
+    except (TypeError, ValueError):
+        return params
+    if "random_state" in signature.parameters:
+        params["random_state"] = repeat
+    return params
+
+
 def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     library_name = bench_case.implementation.library
     estimator_name = bench_case.algorithm.estimator
@@ -153,15 +170,16 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     ):
         t0 = timeit.default_timer()
         for repeat in range(n_runs):
-            estimator_params.setdefault("random_state", repeat)
+            repeat_estimator_params = estimator_params_for_repeat(
+                estimator_class, estimator_params, repeat
+            )
             row = run_case_once(
                 bench_case,
-                estimator_class(**estimator_params),
+                estimator_class(**repeat_estimator_params),
                 data,
                 data_description,
-                repeat,
             )
-            fp.write(json.dumps(row) + "\n")
+            fp.write(json.dumps(row, default=_as_jsonable) + "\n")
             fp.flush()
             if timeit.default_timer() - t0 > time_limit:
                 logger.warning(f"runner exceeded time limit ({time_limit} seconds)")

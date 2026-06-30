@@ -1,9 +1,14 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LinearRegression
 
+from reporting.matching import _iter_results_from_bench_case
 from sklbench.config import load_cases_from_script, validate_case
-from sklbench.orchestrator.implementation import aggregate_runner_rows
+from sklbench.orchestrator import implementation
+from sklbench.runner.__main__ import estimator_params_for_repeat
 
 
 def minimal_case(**overrides):
@@ -142,33 +147,105 @@ def test_active_configs_generate_valid_cases(path):
     assert all(case.algorithm.estimator != "DBSCAN" for case in cases)
 
 
-def test_orchestrator_aggregates_runner_jsonl_rows():
+def test_orchestrator_stores_runner_jsonl_rows(monkeypatch):
     rows = [
         {
             "case": {"bench": {"n_runs": 2}},
-            "repeat": 0,
             "data_desc": {"fit": {"samples": 4}, "predict": {"samples": 2}},
             "time_ms": {"fit": 1.0, "predict": 0.5},
             "metrics": {"fit": {"accuracy": 1.0}, "predict": {"accuracy": 0.5}},
-            "execution_metrics": {"fit": {"cpu load[%]": [10]}},
+            "profiling_metrics": {"fit": {"cpu load[%]": [10]}},
             "attributes": {"n_iter": 2},
             "logs": {"stdout": "", "stderr": ""},
         },
         {
             "case": {"bench": {"n_runs": 2}},
-            "repeat": 1,
             "data_desc": {"fit": {"samples": 4}, "predict": {"samples": 2}},
             "time_ms": {"fit": 1.5, "predict": 0.75},
             "metrics": {"fit": {"accuracy": 1.0}, "predict": {"accuracy": 0.5}},
-            "execution_metrics": {"fit": {"cpu load[%]": [20]}},
+            "profiling_metrics": {"fit": {"cpu load[%]": [20]}},
             "attributes": {"n_iter": 2},
             "logs": {"stdout": "", "stderr": ""},
         },
     ]
 
-    result = aggregate_runner_rows(rows)
+    def run_runner_from_case(bench_case, log_level):
+        return 0, rows, None
 
-    assert result["time[ms]"] == {"fit": [1.0, 1.5], "predict": [0.5, 0.75]}
-    assert result["metrics"]["fit"]["cpu load[%]"] == [10, 20]
-    assert result["metrics"]["fit"]["n_iter"] == 2
-    assert result["data_desc"]["predict"]["samples"] == 2
+    monkeypatch.setattr(implementation, "run_runner_from_case", run_runner_from_case)
+    _, results, failed_cases = implementation.call_benchmarks(
+        [validate_case(minimal_case())]
+    )
+
+    assert failed_cases == []
+    assert results == [
+        {"case": validate_case(minimal_case()).json_dict(), "results": rows}
+    ]
+
+
+def test_reporting_reads_raw_runner_results():
+    bench_case = {
+        "case": validate_case(minimal_case()).json_dict(),
+        "results": [
+            {
+                "data_desc": {"fit": {"samples": 4}, "predict": {"samples": 2}},
+                "time_ms": {"fit": 1.0, "predict": 0.5},
+                "metrics": {
+                    "fit": {"R2": 1.0},
+                    "predict": {"R2": 0.5},
+                },
+                "profiling_metrics": {"fit": {"cpu load[%]": [10]}},
+                "attributes": {"n_iter": 2},
+                "logs": {"stdout": "", "stderr": ""},
+            },
+            {
+                "data_desc": {"fit": {"samples": 4}, "predict": {"samples": 2}},
+                "time_ms": {"fit": 1.5, "predict": 0.75},
+                "metrics": {
+                    "fit": {"R2": 1.0},
+                    "predict": {"R2": 0.5},
+                },
+                "profiling_metrics": {"fit": {"cpu load[%]": [20]}},
+                "attributes": {"n_iter": 2},
+                "logs": {"stdout": "", "stderr": ""},
+            },
+        ],
+    }
+
+    results = list(
+        _iter_results_from_bench_case(
+            bench_case=bench_case,
+            hardware_hash="hardware",
+            software_hash="software",
+            timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+    )
+
+    fit_result = next(result for result in results if result.method == "fit")
+    predict_result = next(result for result in results if result.method == "predict")
+
+    assert fit_result.times == [1.0, 1.5]
+    assert fit_result.metrics["fit"]["cpu load[%]"] == [10, 20]
+    assert fit_result.attributes == {"n_iter": 2}
+    assert predict_result.times == [0.5, 0.75]
+    assert predict_result.data_desc == {"samples": 2}
+
+
+def test_estimator_params_for_repeat_sets_supported_random_state():
+    params = estimator_params_for_repeat(RandomForestClassifier, {"n_estimators": 2}, 3)
+
+    assert params == {"n_estimators": 2, "random_state": 3}
+
+
+def test_estimator_params_for_repeat_skips_unsupported_random_state():
+    params = estimator_params_for_repeat(LinearRegression, {}, 3)
+
+    assert params == {}
+
+
+def test_estimator_params_for_repeat_preserves_explicit_random_state():
+    params = estimator_params_for_repeat(
+        RandomForestClassifier, {"random_state": 42}, 3
+    )
+
+    assert params == {"random_state": 42}
