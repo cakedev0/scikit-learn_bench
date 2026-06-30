@@ -88,7 +88,6 @@ def run_case_once(
     estimator,
     data,
     data_description: Dict,
-    repeat: int,
 ) -> Dict:
     task = estimator_to_task(bench_case.algorithm.estimator)
     X_train, X_test, y_train, y_test = data
@@ -127,7 +126,6 @@ def run_case_once(
         data_desc["predict"].update({"n_classes": data_description["n_classes"]})
 
     return {
-        "repeat": repeat,
         "data_desc": data_desc,
         "time_ms": times,
         "metrics": quality_metrics,
@@ -155,6 +153,7 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     ):
         t0 = timeit.default_timer()
         for repeat in range(n_runs):
+            estimator_params.setdefault("random_state", repeat)
             row = run_case_once(
                 bench_case,
                 estimator_class(**estimator_params),
