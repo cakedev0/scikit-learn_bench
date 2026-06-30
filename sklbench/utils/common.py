@@ -18,15 +18,11 @@ import hashlib
 import importlib
 import inspect
 import json
-import re
-import warnings
 from pprint import pformat
 from shutil import get_terminal_size
 from typing import Any, Dict, List, Tuple, Union
 
-import numpy as np
-
-from .custom_types import JsonTypesUnion, ModuleContentMap, Numeric
+from .custom_types import JsonTypesUnion, ModuleContentMap
 
 # ANSI escape codes for in-terminal formatting
 BCOLORS = {

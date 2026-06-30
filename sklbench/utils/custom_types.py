@@ -21,8 +21,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 
 NumpyNumeric = Union[np.unsignedinteger, np.integer, np.floating]
-Numeric = Union[int, float]
-Scalar = Union[Numeric, bool, str, None]
+Scalar = Union[int, float, bool, str, None]
 JsonTypesUnion = Union[Scalar, List, Dict]
 # TODO: replace Any with Union[Callable, ...]
 ModuleContentMap = Dict[str, List[Any]]
