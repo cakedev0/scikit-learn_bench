@@ -8,7 +8,12 @@ from sklbench.orchestrator.implementation import aggregate_runner_rows
 
 def minimal_case(**overrides):
     case = {
-        "bench": {"n_runs": 1, "time_limit": None},
+        "bench": {
+            "n_runs": 1,
+            "time_limit": 600,
+            "flush_cache": False,
+            "memory_profiling_interval": 0.001,
+        },
         "implementation": {"library": "sklearn", "device": None},
         "algorithm": {
             "estimator": "Ridge",
@@ -33,6 +38,19 @@ def test_validate_case_returns_model_with_normalized_json_dict():
     assert case_dict["bench"] == {"n_runs": 1}
     assert json.loads(json.dumps(case_dict, allow_nan=False)) == case_dict
     assert case.data.name(shortened=True) == "make_regr"
+
+
+def test_validate_case_elides_default_bench_values():
+    case = validate_case(
+        {
+            "bench": {"n_runs": 10, "time_limit": 600, "flush_cache": False},
+            "implementation": {"library": "sklearn"},
+            "algorithm": {"estimator": "Ridge"},
+            "data": {"source": "make_regression"},
+        }
+    )
+
+    assert "bench" not in case.json_dict()
 
 
 def test_validate_case_rejects_invalid_top_level_sections():
