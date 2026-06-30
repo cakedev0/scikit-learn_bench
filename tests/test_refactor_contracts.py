@@ -280,12 +280,12 @@ def test_reporting_reads_raw_runner_results():
                     make_run(
                         fit_time=1.0,
                         predict_time=0.5,
-                        attributes={"n_iter": 2},
+                        attributes={"n_iter": 2, "solver": "svd"},
                     ),
                     make_run(
                         fit_time=1.5,
                         predict_time=0.75,
-                        attributes={"n_iter": 2},
+                        attributes={"n_iter": 2, "solver": "svd"},
                     ),
                 ]
             )
@@ -296,10 +296,9 @@ def test_reporting_reads_raw_runner_results():
     predict_result = next(result for result in results if result.method == "predict")
 
     assert fit_result.times == [1.0, 1.5]
-    assert fit_result.metric_samples["fit"]["R2"] == [1.0, 1.0]
-    assert fit_result.metrics["fit"]["R2"] == 1.0
+    assert fit_result.metrics["fit"]["R2"] == [1.0, 1.0]
     assert "cpu load[%]" not in fit_result.metrics["fit"]
-    assert fit_result.attributes == {"iterations": [2]}
+    assert fit_result.attributes == {"n_iter": [2], "solver": ["svd"]}
     assert predict_result.times == [0.5, 0.75]
     assert predict_result.data_desc == {"samples": 2}
 
@@ -397,7 +396,7 @@ def test_metric_matching_uses_three_sigma_tolerance_floor():
     assert Match(base_result, candidate_result, warnings=[]).metrics_match
 
 
-def test_iteration_warning_uses_selected_attributes_only():
+def test_iteration_warning_uses_n_iter_from_generic_attributes():
     base_result = next(
         result
         for result in method_results_from_records(
@@ -417,8 +416,31 @@ def test_iteration_warning_uses_selected_attributes_only():
     append_iterations_warning(base_result, candidate_result, warnings)
 
     assert len(warnings) == 1
-    assert base_result.attributes == {"iterations": [2]}
-    assert candidate_result.attributes == {"iterations": [3]}
+    assert base_result.attributes == {"n_iter": [2], "solver": ["svd"]}
+    assert candidate_result.attributes == {"n_iter": [3], "solver": ["lbfgs"]}
+
+
+def test_iteration_warning_handles_missing_baseline_n_iter():
+    base_result = next(
+        result
+        for result in method_results_from_records(
+            [make_record([make_run(attributes={"solver": "svd"})])]
+        )
+        if result.method == "fit"
+    )
+    candidate_result = next(
+        result
+        for result in method_results_from_records(
+            [make_record([make_run(attributes={"solver": "lbfgs", "n_iter": 3})])]
+        )
+        if result.method == "fit"
+    )
+    warnings = []
+
+    append_iterations_warning(base_result, candidate_result, warnings)
+
+    assert len(warnings) == 1
+    assert warnings[0].short_message == "(, vs 3)"
 
 
 def test_estimator_params_for_repeat_sets_supported_random_state():
