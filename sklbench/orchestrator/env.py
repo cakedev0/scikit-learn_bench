@@ -1,5 +1,8 @@
 import json
+import importlib
+from importlib import metadata
 import os
+from pathlib import Path
 import subprocess
 from typing import Dict
 
@@ -21,9 +24,109 @@ def get_threadpool_info():
     return threadpools
 
 
+def _check_output(command: list[str], cwd: str | Path | None = None) -> str | None:
+    """Run a metadata command and return None when it cannot be collected."""
+    try:
+        return subprocess.check_output(
+            command,
+            cwd=cwd,
+            shell=False,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except Exception:
+        return None
+
+
+def _git_info_for_path(path: Path) -> dict | None:
+    """Return git metadata for an imported module path when it is in a checkout.
+
+    This is best-effort environment metadata, not benchmark logic. Editable
+    installs from scikit-learn source trees are the important case: Pixi can
+    report that a package is installed, but the imported code's git commit is
+    what makes a performance result attributable.
+    """
+    module_dir = path if path.is_dir() else path.parent
+    git_root = _check_output(["git", "rev-parse", "--show-toplevel"], cwd=module_dir)
+    if git_root is None:
+        return None
+
+    commit = _check_output(["git", "rev-parse", "HEAD"], cwd=git_root)
+    if commit is None:
+        return None
+
+    branch = _check_output(["git", "branch", "--show-current"], cwd=git_root)
+    dirty = bool(
+        _check_output(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=git_root,
+        )
+    )
+
+    info = {"commit": commit, "dirty": dirty}
+    if branch:
+        info["branch"] = branch
+    describe = _check_output(
+        ["git", "describe", "--tags", "--always", "--dirty"], cwd=git_root
+    )
+    if describe:
+        info["describe"] = describe
+    return info
+
+
+def _distribution_name(import_name: str) -> str:
+    """Map import names to their Python distribution names."""
+    return {"sklearn": "scikit-learn"}.get(import_name, import_name)
+
+
+def get_runtime_import_info(import_names: list[str] | None = None) -> dict:
+    """Collect metadata for packages as they are imported by this environment.
+
+    `pixi list` records the solved environment. That is not always enough for
+    benchmarking source builds because an editable install can point at a local
+    checkout. Runtime import metadata records the actual imported package
+    version, distribution version, and git commit when the module file lives in
+    a git repository.
+
+    The default package list is intentionally short. Keep additions explicit so
+    result metadata stays predictable.
+    """
+    if import_names is None:
+        import_names = ["sklearn", "numpy", "scipy", "pandas"]
+
+    result = {}
+    for import_name in import_names:
+        package_info = {}
+        try:
+            module = importlib.import_module(import_name)
+        except Exception as exc:
+            result[import_name] = {"import_error": repr(exc)}
+            continue
+
+        runtime_version = getattr(module, "__version__", None)
+        if runtime_version is not None:
+            package_info["version"] = runtime_version
+
+        dist_name = _distribution_name(import_name)
+        try:
+            package_info["distribution_version"] = metadata.version(dist_name)
+        except metadata.PackageNotFoundError:
+            pass
+
+        module_file = getattr(module, "__file__", None)
+        if module_file is not None:
+            git_info = _git_info_for_path(Path(module_file).resolve())
+            if git_info is not None:
+                package_info["git"] = git_info
+
+        result[import_name] = package_info
+    return result
+
+
 def get_software_info() -> Dict:
     result = {}
     result["threadpool_info"] = get_threadpool_info()
+    result["runtime_imports"] = get_runtime_import_info()
 
     pixi_project_root = os.environ.get("PIXI_PROJECT_ROOT")
     pixi_environment_name = os.environ.get("PIXI_ENVIRONMENT_NAME")
