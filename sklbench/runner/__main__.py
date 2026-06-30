@@ -4,6 +4,7 @@ import sys
 import timeit
 from pathlib import Path
 from typing import Any, Dict, Tuple
+import statistics
 
 import numpy as np
 
@@ -38,25 +39,47 @@ def _as_jsonable(value: Any):
     return None
 
 
-def _collect_model_attributes(estimator_instance) -> Dict[str, Any]:
+def _collect_model_attributes(estimator) -> Dict[str, Any]:
     attributes = {}
     for attribute_name in [
         "n_iter_",
+        "solver_",
         "n_features_in_",
         "n_outputs_",
         "n_clusters_",
         "n_components_",
-        "classes_",
-        "support_vectors_",
+        "oob_score_",
     ]:
-        if not hasattr(estimator_instance, attribute_name):
+        if not hasattr(estimator, attribute_name):
             continue
-        value = getattr(estimator_instance, attribute_name)
+        value = getattr(estimator, attribute_name)
         if attribute_name == "support_vectors_" and value is not None:
             value = len(value)
         jsonable = _as_jsonable(value)
         if jsonable is not None:
             attributes[attribute_name.rstrip("_")] = jsonable
+
+    if hasattr(estimator, "estimators_") and hasattr(estimator.estimators_[0], "tree_"):
+        attributes["avg_n_leaves"] = statistics.mean(
+            tree.tree_.n_leaves
+            for tree in estimator.estimators_
+        )
+        attributes["avg_max_depth"] = statistics.mean(
+            tree.tree_.max_depth
+            for tree in estimator.estimators_
+        )
+
+    for name, value in vars(estimator).items():
+        if not name.endswith("_") or name.startswith("_"):
+            # not a public attribute
+            continue
+        attribute_name = name.rstrip("_")
+        if attribute_name.rstrip("_") in attributes:
+            # already collected
+            continue
+        if isinstance(value, (int, float, str)):
+            attributes[attribute_name] = _as_jsonable(value)
+
     return attributes
 
 
