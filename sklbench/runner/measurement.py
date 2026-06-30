@@ -128,9 +128,43 @@ def _monitor_memory_usage(
 def measure_perf(
     func,
     *args,
-    bench_params: Bench,
+    bench_params: Bench = None,
     **kwargs,
 ):
+    """
+    Measure performance metrics of a function execution.
+
+    Executes the given function and collects performance metrics including
+    execution time and optionally CPU load, memory usage (RAM and VRAM),
+    with support for cache flushing and profiling integration.
+
+    Parameters
+    ----------
+    func : callable
+        The function to measure.
+    *args
+        Positional arguments to pass to func.
+    bench_params : Bench, optional
+        Benchmark configuration parameters controlling which metrics to collect
+        and profiling options (VTune, cache flushing, garbage collection, etc.).
+        If None, default Bench() parameters are used.
+    **kwargs
+        Keyword arguments to pass to func.
+
+    Returns
+    -------
+    tuple
+        A tuple of (time_ms, perf_metrics) where:
+        - time_ms : float
+            Execution time in milliseconds.
+        - perf_metrics : dict
+            Dictionary containing optional performance metrics:
+            - "peak RAM usage[MB]" : list of floats (if memory_profile enabled)
+            - "peak VRAM usage[MB]" : list of floats (if NVML profiling enabled)
+            - "cpu load[%]" : list of floats (if cpu_profile enabled)
+    """
+    if bench_params is None:
+        bench_params = Bench()  # use defaults
     enable_itt = bench_params.vtune_profiling is not None
     enable_cache_flushing = bench_params.flush_cache
     enable_garbage_collection = bench_params.gc_collect

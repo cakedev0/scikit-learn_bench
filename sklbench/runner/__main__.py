@@ -83,12 +83,6 @@ def _collect_model_attributes(estimator) -> Dict[str, Any]:
     return attributes
 
 
-def _split_time_and_metrics(result: Dict) -> Tuple[float, Dict]:
-    time_values = result.get("time[ms]", [])
-    time_value = time_values[0] if isinstance(time_values, list) else time_values
-    return time_value, {key: value for key, value in result.items() if key != "time[ms]"}
-
-
 def run_case_once(
     bench_case: BenchCase,
     estimator,
