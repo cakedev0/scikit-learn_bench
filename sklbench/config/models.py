@@ -21,8 +21,7 @@ class Bench(_Section):
     n_runs: int = 10
     time_limit: float = 600
     taskset: str | int | None = None
-    vtune_profiling: str | None = None
-    vtune_results_directory: str = "_vtune_results"
+    py_spy_profiling: bool = False
     flush_cache: bool = False
     gc_collect: bool = False
     cpu_profile: bool = False

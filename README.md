@@ -7,7 +7,7 @@
 Benefits:
 - Full control of benchmarks suite through Python config scripts
 - Flexible benchmark case generation with ordinary Python
-- Available with advanced profiling tools, such as Intel(R) VTune* Profiler
+- Optional profiling support through py-spy flamegraphs
 
 ### 📜 Table of Contents
 

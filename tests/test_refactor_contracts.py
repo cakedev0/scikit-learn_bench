@@ -162,7 +162,7 @@ def test_active_configs_generate_valid_cases(path):
     assert all(case.algorithm.estimator != "DBSCAN" for case in cases)
 
 
-def test_orchestrator_stores_runner_jsonl_rows(monkeypatch):
+def test_orchestrator_stores_runner_jsonl_rows(monkeypatch, tmp_path):
     rows = [
         {
             "case": {"bench": {"n_runs": 2}},
@@ -188,14 +188,27 @@ def test_orchestrator_stores_runner_jsonl_rows(monkeypatch):
         return 0, rows, None
 
     monkeypatch.setattr(implementation, "run_runner_from_case", run_runner_from_case)
-    _, results, failed_cases = implementation.call_benchmarks(
-        [validate_case(minimal_case())]
+    _, records, failed_cases = implementation.call_benchmarks(
+        [validate_case(minimal_case())],
+        "hardware",
+        "software",
+        str(tmp_path),
     )
 
     assert failed_cases == []
-    assert results == [
-        {"case": validate_case(minimal_case()).json_dict(), "results": rows}
-    ]
+    expected_record = {
+        "hardware_hash": "hardware",
+        "software_hash": "software",
+        "case": validate_case(minimal_case()).json_dict(),
+        "results": rows,
+        "failed_case": None,
+    }
+    assert records == [expected_record]
+
+    record_files = list((tmp_path / "records").glob("*.json"))
+    assert len(record_files) == 1
+    with record_files[0].open(encoding="utf-8") as fp:
+        assert json.load(fp) == expected_record
 
 
 def test_runner_serializes_small_array_like_attributes():
@@ -258,15 +271,20 @@ def make_run(
 
 
 def test_read_benchmark_records_reads_raw_results(tmp_path):
-    result_path = tmp_path / "20260101T010203000004Z.json"
+    records_dir = tmp_path / "records"
+    records_dir.mkdir()
+    result_path = (
+        records_dir / "sklearn_Ridge_make_regr_abcde_20260101T010203000004Z.json"
+    )
     case = validate_case(minimal_case()).json_dict()
     result_path.write_text(
         json.dumps(
             {
                 "hardware_hash": "hardware",
                 "software_hash": "software",
-                "bench_cases": [{"case": case, "results": [make_run()]}],
-                "failed_cases": [],
+                "case": case,
+                "results": [make_run()],
+                "failed_case": None,
             }
         ),
         encoding="utf-8",
@@ -449,7 +467,7 @@ def test_iteration_warning_handles_missing_baseline_n_iter():
     append_iterations_warning(base_result, candidate_result, warnings)
 
     assert len(warnings) == 1
-    assert warnings[0].short_message == "(, vs 3)"
+    assert warnings[0].short_message == "(? vs 3)"
 
 
 def test_estimator_params_for_repeat_sets_supported_random_state():

@@ -15,13 +15,6 @@ from ..config import Bench
 from ..utils.logger import logger
 
 try:
-    import itt
-
-    itt_is_available = True
-except (ImportError, ModuleNotFoundError):
-    itt_is_available = False
-
-try:
     import pynvml
 
     try:
@@ -146,7 +139,7 @@ def measure_perf(
         Positional arguments to pass to func.
     bench_params : Bench, optional
         Benchmark configuration parameters controlling which metrics to collect
-        and profiling options (VTune, cache flushing, garbage collection, etc.).
+        and runtime options such as cache flushing and garbage collection.
         If None, default Bench() parameters are used.
     **kwargs
         Keyword arguments to pass to func.
@@ -165,20 +158,12 @@ def measure_perf(
     """
     if bench_params is None:
         bench_params = Bench()  # use defaults
-    enable_itt = bench_params.vtune_profiling is not None
     enable_cache_flushing = bench_params.flush_cache
     enable_garbage_collection = bench_params.gc_collect
     enable_cpu_profiling = bench_params.cpu_profile
     enable_memory_profiling = bench_params.memory_profile
     memory_profiling_interval = bench_params.memory_profiling_interval
     enable_nvml_profiling = False
-
-    if enable_itt and not itt_is_available:
-        logger.warning(
-            "Intel(R) VTune(TM) profiling was requested "
-            'but "itt" python module is not available.'
-        )
-        enable_itt = False
 
     if enable_cpu_profiling:
         cpu_loads = []
@@ -189,8 +174,6 @@ def measure_perf(
 
     if enable_cache_flushing:
         _flush_cache()
-    if enable_itt:
-        itt.resume()
     if enable_memory_profiling:
         memory_profiles = {"RAM": []}
         if enable_nvml_profiling:
@@ -221,8 +204,6 @@ def measure_perf(
         memory_peaks["RAM"].append(max(memory_profiles["RAM"]))
         if enable_nvml_profiling:
             memory_peaks["VRAM"].append(max(memory_profiles["VRAM"]))
-    if enable_itt:
-        itt.pause()
 
     time_ms = 1000 * (t1 - t0)
     if enable_garbage_collection:

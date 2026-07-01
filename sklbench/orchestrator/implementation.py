@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 from multiprocessing import Pool
 from pathlib import Path
@@ -14,6 +15,9 @@ from .commands import run_runner_from_case
 from .env import get_environment_info
 
 
+_UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9_.-]+")
+
+
 def get_hardware_hash(hardware_info: dict) -> str:
     return hash_from_json_repr(hardware_info, hash_limit=6)
 
@@ -22,53 +26,18 @@ def get_software_hash(software_info: dict) -> str:
     return hash_from_json_repr(software_info, hash_limit=6)
 
 
-def call_benchmarks(
-    bench_cases: list[BenchCase],
-    log_level: str = "WARNING",
-    early_exit: bool = False,
-) -> tuple[int, list[dict], list[dict]]:
-    results = []
-    failed_cases = []
-    return_code = 0
-
-    bench_cases_with_pbar = tqdm(bench_cases)
-    for bench_case in bench_cases_with_pbar:
-        bench_cases_with_pbar.set_description(
-            custom_format(bench_case.name(shortened=True), bcolor="HEADER")
-        )
-        try:
-            bench_return_code, rows, failed_case = run_runner_from_case(
-                bench_case, log_level
-            )
-            if bench_return_code != 0:
-                return_code = bench_return_code
-                if failed_case is not None:
-                    failed_cases.append(failed_case)
-                if early_exit:
-                    break
-            results.append({"case": bench_case.json_dict(), "results": rows})
-        except KeyboardInterrupt:
-            return_code = -1
-            break
-        except Exception as exc:
-            return_code = -1
-            failed_cases.append(
-                {
-                    "case": bench_case.json_dict(),
-                    "return_code": return_code,
-                    "error": repr(exc),
-                    "logs": {"stdout": "", "stderr": str(exc)},
-                }
-            )
-            logger.warning(f"Benchmark failed before subprocess execution: {exc}")
-            if early_exit:
-                break
-    return return_code, results, failed_cases
+def _timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
 
 
-def save_results(
-    benchmark_results: list[dict],
-    failed_cases: list[dict],
+def _case_basename(bench_case: BenchCase) -> str:
+    case_slug = bench_case.name(shortened=True, separator="_")
+    case_slug = _UNSAFE_FILENAME_CHARS.sub("_", case_slug).strip("_")
+    case_hash = hash_from_json_repr(bench_case.json_dict())
+    return f"{case_slug}_{case_hash}_{_timestamp()}"
+
+
+def save_environment_sidecars(
     hardware_hash: str,
     software_hash: str,
     env_info: dict,
@@ -91,17 +60,136 @@ def save_results(
         except FileExistsError:
             pass
 
-    result = {
+
+def save_benchmark_record(
+    record_path: Path,
+    bench_case: BenchCase,
+    rows: list[dict],
+    failed_case: dict | None,
+    hardware_hash: str,
+    software_hash: str,
+):
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
         "hardware_hash": hardware_hash,
         "software_hash": software_hash,
-        "bench_cases": benchmark_results,
-        "failed_cases": failed_cases,
+        "case": bench_case.json_dict(),
+        "results": rows,
+        "failed_case": failed_case,
     }
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    result_file = results_root / f"{timestamp}.json"
-    with result_file.open("x", encoding="utf-8") as fp:
-        json.dump(result, fp, indent=4)
-    logger.warning(f"Benchmark results saved to {result_file}")
+    with record_path.open("x", encoding="utf-8") as fp:
+        json.dump(record, fp, indent=4)
+    logger.warning(f"Benchmark result saved to {record_path}")
+
+
+def call_benchmarks(
+    bench_cases: list[BenchCase],
+    hardware_hash: str,
+    software_hash: str,
+    results_dir: str,
+    log_level: str = "WARNING",
+    early_exit: bool = False,
+) -> tuple[int, list[dict], list[dict]]:
+    results = []
+    failed_cases = []
+    return_code = 0
+    results_root = Path(results_dir)
+    records_dir = results_root / "records"
+    profiles_dir = results_root / "profiles"
+
+    bench_cases_with_pbar = tqdm(bench_cases)
+    for bench_case in bench_cases_with_pbar:
+        basename = _case_basename(bench_case)
+        record_path = records_dir / f"{basename}.json"
+        profile_path = profiles_dir / f"{basename}.svg"
+        record_saved = False
+        bench_cases_with_pbar.set_description(
+            custom_format(bench_case.name(shortened=True), bcolor="HEADER")
+        )
+        try:
+            bench_return_code, rows, failed_case = run_runner_from_case(
+                bench_case, log_level
+            )
+            save_benchmark_record(
+                record_path,
+                bench_case,
+                rows,
+                failed_case,
+                hardware_hash,
+                software_hash,
+            )
+            record_saved = True
+            if bench_return_code != 0:
+                return_code = bench_return_code
+                if failed_case is not None:
+                    failed_cases.append(failed_case)
+                if early_exit:
+                    break
+            results.append(
+                {
+                    "hardware_hash": hardware_hash,
+                    "software_hash": software_hash,
+                    "case": bench_case.json_dict(),
+                    "results": rows,
+                    "failed_case": failed_case,
+                }
+            )
+            if bench_return_code == 0 and bench_case.bench.py_spy_profiling:
+                profiles_dir.mkdir(parents=True, exist_ok=True)
+                profile_n_runs = max(1, bench_case.bench.n_runs // 3)
+                profile_return_code, _, profile_failed_case = run_runner_from_case(
+                    bench_case,
+                    log_level,
+                    py_spy_output=profile_path,
+                    n_runs_override=profile_n_runs,
+                )
+                if profile_return_code != 0:
+                    return_code = profile_return_code
+                    if profile_failed_case is not None:
+                        failed_cases.append(profile_failed_case)
+                    if early_exit:
+                        break
+        except KeyboardInterrupt:
+            return_code = -1
+            failed_case = {
+                "case": bench_case.json_dict(),
+                "return_code": return_code,
+                "error": "KeyboardInterrupt",
+                "logs": {"stdout": "", "stderr": "KeyboardInterrupt"},
+            }
+            if not record_saved:
+                save_benchmark_record(
+                    record_path,
+                    bench_case,
+                    [],
+                    failed_case,
+                    hardware_hash,
+                    software_hash,
+                )
+            failed_cases.append(failed_case)
+            break
+        except Exception as exc:
+            return_code = -1
+            failed_case = {
+                "case": bench_case.json_dict(),
+                "return_code": return_code,
+                "error": repr(exc),
+                "logs": {"stdout": "", "stderr": str(exc)},
+            }
+            if not record_saved:
+                save_benchmark_record(
+                    record_path,
+                    bench_case,
+                    [],
+                    failed_case,
+                    hardware_hash,
+                    software_hash,
+                )
+            failed_cases.append(failed_case)
+            logger.warning(f"Benchmark failed before subprocess execution: {exc}")
+            if early_exit:
+                break
+    return return_code, results, failed_cases
 
 
 def orchestrate_benchmarks(
@@ -116,6 +204,12 @@ def orchestrate_benchmarks(
     env_info = get_environment_info()
     hardware_hash = get_hardware_hash(env_info["hardware"])
     software_hash = get_software_hash(env_info["software"])
+    save_environment_sidecars(
+        hardware_hash,
+        software_hash,
+        env_info,
+        args.results_dir,
+    )
 
     if args.prefetch_datasets:
         dataset_cases = {case.data.name(): case for case in bench_cases}
@@ -128,16 +222,12 @@ def orchestrate_benchmarks(
 
     return_code, result, failed_cases = call_benchmarks(
         bench_cases,
+        hardware_hash,
+        software_hash,
+        args.results_dir,
         args.bench_log_level,
         args.exit_on_error,
     )
     logger.debug(custom_format(result))
-    save_results(
-        result,
-        failed_cases,
-        hardware_hash,
-        software_hash,
-        env_info,
-        args.results_dir,
-    )
+    logger.debug(custom_format(failed_cases))
     return return_code
