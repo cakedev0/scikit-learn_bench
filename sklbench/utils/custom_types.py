@@ -14,20 +14,20 @@
 # limitations under the License.
 # ===============================================================================
 
-from typing import Any, Dict, List, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 
-NumpyNumeric = Union[np.unsignedinteger, np.integer, np.floating]
-Scalar = Union[int, float, bool, str, None]
-JsonTypesUnion = Union[Scalar, List, Dict]
-# TODO: replace Any with Union[Callable, ...]
-ModuleContentMap = Dict[str, List[Any]]
+NumpyNumeric = np.unsignedinteger | np.integer | np.floating
+Scalar = int | float | bool | str | None
+JsonTypesUnion = Scalar | list | dict
+# TODO: replace Any with Callable | ...
+ModuleContentMap = dict[str, list[Any]]
 # template may contain lists on first level
-BenchTemplate = Dict[str, Any]
+BenchTemplate = dict[str, Any]
 
-BenchResult = Dict[str, Union[Scalar, List]]
+BenchResult = dict[str, Scalar | list]
 
-Array = Union[pd.DataFrame, np.ndarray, csr_matrix]
+Array = pd.DataFrame | np.ndarray | csr_matrix

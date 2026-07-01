@@ -16,7 +16,6 @@
 
 import gc
 import os
-from typing import Dict, Tuple
 
 from ..config import BenchCase
 from ..utils.common import custom_format
@@ -28,7 +27,7 @@ from .loaders import (
 )
 
 
-def load_data(bench_case: BenchCase) -> Tuple[Dict, Dict]:
+def load_data(bench_case: BenchCase) -> tuple[dict, dict]:
     data_params = bench_case.data
     data_name = data_params.name(shortened=False)
     data_cache = data_params.cache_directory or os.environ.get(

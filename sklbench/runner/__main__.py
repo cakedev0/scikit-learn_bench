@@ -6,7 +6,7 @@ import statistics
 import sys
 import timeit
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -19,7 +19,7 @@ from .measurement import measure_perf
 from .metrics import get_subset_metrics_of_estimator
 
 
-def _array_like_size(value: Any) -> Optional[int]:
+def _array_like_size(value: Any) -> int | None:
     size = getattr(value, "size", None)
     if isinstance(size, int):
         return size
@@ -43,7 +43,7 @@ def _array_like_size(value: Any) -> Optional[int]:
     return None
 
 
-def _array_like_metadata(value: Any) -> Optional[dict]:
+def _array_like_metadata(value: Any) -> dict | None:
     metadata = {}
     shape = getattr(value, "shape", None)
     if shape is not None:
@@ -95,7 +95,7 @@ def _as_jsonable(value: Any):
     return None
 
 
-def _collect_model_attributes(estimator) -> Dict[str, Any]:
+def _collect_model_attributes(estimator) -> dict[str, Any]:
     attributes = {}
     for attribute_name in [
         "n_iter_",
@@ -117,12 +117,10 @@ def _collect_model_attributes(estimator) -> Dict[str, Any]:
 
     if hasattr(estimator, "estimators_") and hasattr(estimator.estimators_[0], "tree_"):
         attributes["avg_n_leaves"] = statistics.mean(
-            tree.tree_.n_leaves
-            for tree in estimator.estimators_
+            tree.tree_.n_leaves for tree in estimator.estimators_
         )
         attributes["avg_max_depth"] = statistics.mean(
-            tree.tree_.max_depth
-            for tree in estimator.estimators_
+            tree.tree_.max_depth for tree in estimator.estimators_
         )
 
     for name, value in vars(estimator).items():
@@ -143,8 +141,8 @@ def run_case_once(
     bench_case: BenchCase,
     estimator,
     data,
-    data_description: Dict,
-) -> Dict:
+    data_description: dict,
+) -> dict:
     task = estimator_to_task(bench_case.algorithm.estimator)
     X_train, X_test, y_train, y_test = data
 
@@ -191,8 +189,8 @@ def run_case_once(
 
 
 def estimator_params_for_repeat(
-    estimator_class, estimator_params: Dict, repeat: int
-) -> Dict:
+    estimator_class, estimator_params: dict, repeat: int
+) -> dict:
     params = dict(estimator_params)
     if "random_state" in params:
         return params
@@ -220,8 +218,9 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     n_runs = bench_case.bench.n_runs
     time_limit = bench_case.bench.time_limit
 
-    with output_jsonl.open("w", encoding="utf-8") as fp, get_context(
-        bench_case.implementation
+    with (
+        output_jsonl.open("w", encoding="utf-8") as fp,
+        get_context(bench_case.implementation),
     ):
         t0 = timeit.default_timer()
         for repeat in range(n_runs):

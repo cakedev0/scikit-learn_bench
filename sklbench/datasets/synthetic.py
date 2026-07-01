@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============================================================================
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import numpy as np
 from sklearn.datasets import make_classification, make_regression
 from sklearn.utils import check_random_state
 
 
-ColumnSpec = Union[str, Sequence[str]]
+ColumnSpec = str | Sequence[str]
 
 
 def transform_columns(
@@ -50,9 +50,7 @@ def transform_columns(
             )
             mask = rng.rand(binned.size) < noise_ratio
             if mask.any():
-                binned[mask] = rng.geometric(
-                    min(1, 20 / mask.sum()), size=mask.sum()
-                )
+                binned[mask] = rng.geometric(min(1, 20 / mask.sum()), size=mask.sum())
             x[:, col_idx] = binned
         else:
             raise ValueError(col_type)
@@ -65,9 +63,7 @@ def make_trees_regression_data(*, columns: ColumnSpec, random_state=None, **kwar
     return x, y
 
 
-def make_trees_classification_data(
-    *, columns: ColumnSpec, random_state=None, **kwargs
-):
+def make_trees_classification_data(*, columns: ColumnSpec, random_state=None, **kwargs):
     rng = check_random_state(random_state)
     x, y = make_classification(**kwargs, random_state=rng)
     transform_columns(x, columns, rng)

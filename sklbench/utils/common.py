@@ -20,7 +20,7 @@ import inspect
 import json
 from pprint import pformat
 from shutil import get_terminal_size
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
 
 from .custom_types import JsonTypesUnion, ModuleContentMap
 
@@ -40,7 +40,7 @@ BCOLORS = {
 
 def custom_format(
     input_obj: Any,
-    bcolor: Union[str, None] = None,
+    bcolor: str | None = None,
     prettify: bool = True,
     width: int = get_terminal_size().columns,
     indent: int = 4,
@@ -60,17 +60,17 @@ def hash_from_json_repr(x: JsonTypesUnion, hash_limit: int = 5) -> str:
     return h.hexdigest()[:hash_limit]
 
 
-def ensure_list_types_homogeneity(input_list: List):
+def ensure_list_types_homogeneity(input_list: list):
     list_types = set([type(el) for el in input_list])
     if len(list_types) != 1:
-        raise ValueError("List is not type homogeneous. " f"Existing types: {list_types}")
+        raise ValueError(f"List is not type homogeneous. Existing types: {list_types}")
 
 
 def flatten_dict(
-    input_dict: Dict[str, JsonTypesUnion],
+    input_dict: dict[str, JsonTypesUnion],
     key_separator: str = " ",
-    keys_to_remove: List = ["metrics"],
-) -> Dict:
+    keys_to_remove: list = ["metrics"],
+) -> dict:
     output_dict = dict()
     # iteration with inner recursion
     for key, value in input_dict.items():
@@ -89,7 +89,7 @@ def flatten_dict(
     return output_dict
 
 
-def flatten_list(input_list: List, ensure_type_homogeneity: bool = False) -> List:
+def flatten_list(input_list: list, ensure_type_homogeneity: bool = False) -> list:
     output_list = list()
     # iteration with inner recursion
     for value in input_list:
@@ -105,9 +105,9 @@ def flatten_list(input_list: List, ensure_type_homogeneity: bool = False) -> Lis
 
 
 def get_module_members(
-    module_names_chain: Union[List, str],
-) -> Tuple[ModuleContentMap, ModuleContentMap]:
-    def get_module_name(module_names_chain: List[str]) -> str:
+    module_names_chain: list | str,
+) -> tuple[ModuleContentMap, ModuleContentMap]:
+    def get_module_name(module_names_chain: list[str]) -> str:
         name = module_names_chain[0]
         for subname in module_names_chain[1:]:
             name += "." + subname

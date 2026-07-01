@@ -1,11 +1,10 @@
 import argparse
-from typing import Dict, List
 
 import pandas as pd
 
 
 def get_parser_description(parser: argparse.ArgumentParser) -> pd.DataFrame:
-    def get_argument_actions(parser: argparse.ArgumentParser) -> List:
+    def get_argument_actions(parser: argparse.ArgumentParser) -> list:
         arg_actions = []
 
         for action in parser._actions:
@@ -16,7 +15,7 @@ def get_parser_description(parser: argparse.ArgumentParser) -> pd.DataFrame:
                 arg_actions.append(action)
         return arg_actions
 
-    def parse_action(action: argparse.Action) -> Dict:
+    def parse_action(action: argparse.Action) -> dict:
         return {
             "Name": "</br>".join(map(lambda x: f"`{x}`", action.option_strings)),
             "Type": action.type.__name__ if action.type is not None else None,

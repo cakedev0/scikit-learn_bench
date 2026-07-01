@@ -5,7 +5,6 @@ import threading
 import timeit
 from math import ceil, sqrt
 from time import sleep
-from typing import Dict, List, Optional, Tuple
 import joblib
 
 import numpy as np
@@ -46,8 +45,8 @@ def _get_n_from_cache_size():
 
 
 def read_output_from_command(
-    command: str, timeout: Optional[float] = None
-) -> Tuple[int, str, str]:
+    command: str, timeout: float | None = None
+) -> tuple[int, str, str]:
     try:
         res = subprocess.run(
             command.split(" "),
@@ -115,7 +114,7 @@ def _get_vram_usage():
 
 def _monitor_memory_usage(
     interval: float,
-    memory_profiles: Dict[str, List],
+    memory_profiles: dict[str, list],
     stop_event,
     enable_nvml_profiling: bool,
 ):

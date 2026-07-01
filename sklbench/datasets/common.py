@@ -17,7 +17,6 @@
 import json
 import os
 import re
-from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -39,7 +38,7 @@ KNOWN_DATA_EXTENSIONS = ["parq", "npz", "csr.npz"]
 
 
 def get_expr_by_prefix(prefix: str) -> str:
-    def get_or_expr_from_list(a: List[str]) -> str:
+    def get_or_expr_from_list(a: list[str]) -> str:
         # transforms list to OR expression: "['x', 'y']" -> "x|y"
         return str(a)[1:-1].replace("'", "").replace(", ", "|")
 
@@ -49,7 +48,7 @@ def get_expr_by_prefix(prefix: str) -> str:
     return f"{prefix}_({data_comp_expr}).({data_ext_expr})"
 
 
-def get_filenames_by_prefix(directory: str, prefix: str) -> List[str]:
+def get_filenames_by_prefix(directory: str, prefix: str) -> list[str]:
     assert os.path.isdir(directory)
     prefix_expr = get_expr_by_prefix(prefix)
     return list(
@@ -76,7 +75,7 @@ def load_data_file(filepath, extension):
     return data
 
 
-def load_data_from_cache(data_cache: str, data_name: str) -> Dict:
+def load_data_from_cache(data_cache: str, data_name: str) -> dict:
     # data filename format:
     # {data_name}_{data_component}.{file_ext}
     data_filenames = get_filenames_by_prefix(data_cache, data_name)
@@ -92,7 +91,7 @@ def load_data_from_cache(data_cache: str, data_name: str) -> Dict:
     return data
 
 
-def save_data_to_cache(data: Dict, data_cache: str, data_name: str):
+def save_data_to_cache(data: dict, data_cache: str, data_name: str):
     for component_name, data_compoment in data.items():
         component_filepath = os.path.join(data_cache, f"{data_name}_{component_name}")
         # convert 2d numpy array to pandas DataFrame for better caching
@@ -125,13 +124,13 @@ def save_data_to_cache(data: Dict, data_cache: str, data_name: str):
             np.savez(component_filepath, data_compoment)
 
 
-def load_data_description(data_cache: str, data_name: str) -> Dict:
+def load_data_description(data_cache: str, data_name: str) -> dict:
     with open(os.path.join(data_cache, f"{data_name}.json"), "r") as desc_file:
         data_desc = json.load(desc_file)
     return data_desc
 
 
-def save_data_description(data_desc: Dict, data_cache: str, data_name: str):
+def save_data_description(data_desc: dict, data_cache: str, data_name: str):
     with open(os.path.join(data_cache, f"{data_name}.json"), "w") as desc_file:
         json.dump(data_desc, desc_file)
 
@@ -155,10 +154,10 @@ def cache(function):
 
 
 def preprocess_data(
-    data_dict: List[Dict[str, Array]],
-    subsample: Union[float, int, None] = None,
+    data_dict: list[dict[str, Array]],
+    subsample: float | int | None = None,
     **kwargs,
-) -> List[Dict[str, Array]]:
+) -> list[dict[str, Array]]:
     """Preprocessing function applied for all data arguments."""
     if subsample is not None:
         for data_name, data in data_dict.items():

@@ -14,7 +14,6 @@
 # limitations under the License.
 # ===============================================================================
 import os
-from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -40,7 +39,7 @@ from .synthetic import make_trees_classification_data, make_trees_regression_dat
 @cache
 def load_openml_data(
     openml_id: int, data_name: str, data_cache: str, raw_data_cache: str
-) -> Tuple[Dict, Dict]:
+) -> tuple[dict, dict]:
     x, y = load_openml(openml_id, raw_data_cache)
     data_desc = dict()
     unique_labels = pd.Series(y).value_counts()
@@ -53,11 +52,11 @@ def load_openml_data(
 @cache
 def load_sklearn_synthetic_data(
     function_name: str,
-    input_kwargs: Dict,
+    input_kwargs: dict,
     data_name: str,
     data_cache: str,
     raw_data_cache: str,
-) -> Tuple[Dict, Dict]:
+) -> tuple[dict, dict]:
     functions_map = {
         "make_classification": make_classification,
         "make_regression": make_regression,
@@ -72,7 +71,7 @@ def load_sklearn_synthetic_data(
 
     if function_name not in functions_map:
         raise ValueError(
-            f"Unknown {function_name} function " "for synthetic data generation"
+            f"Unknown {function_name} function for synthetic data generation"
         )
     x, y = functions_map[function_name](**generation_kwargs)
     data_desc = dict()
@@ -108,8 +107,8 @@ Classification datasets
 
 @cache
 def load_airline_depdelay(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Airline dataset
     http://kt.ijs.si/elena_ikonomovska/data.html
@@ -175,8 +174,8 @@ def load_airline_depdelay(
 
 @cache
 def load_hepmass(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     HEPMASS dataset from UCI machine learning repository
     https://archive.ics.uci.edu/ml/datasets/HEPMASS.
@@ -215,8 +214,8 @@ def load_hepmass(
 
 
 def load_higgs_susy_subsample(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     if data_name == "susy":
         """
         SUSY dataset from UCI machine learning repository
@@ -241,8 +240,7 @@ def load_higgs_susy_subsample(
         train_size, test_size = 10000000, 1000000
     else:
         raise ValueError(
-            f"Unknown dataset name {data_name} "
-            'for "load_higgs_susy_subsample" function'
+            f'Unknown dataset name {data_name} for "load_higgs_susy_subsample" function'
         )
 
     data = download_and_read_csv(
@@ -263,19 +261,19 @@ def load_higgs_susy_subsample(
 
 
 @cache
-def load_higgs(**kwargs) -> Tuple[Dict, Dict]:
+def load_higgs(**kwargs) -> tuple[dict, dict]:
     return load_higgs_susy_subsample(**kwargs)
 
 
 @cache
-def load_susy(**kwargs) -> Tuple[Dict, Dict]:
+def load_susy(**kwargs) -> tuple[dict, dict]:
     return load_higgs_susy_subsample(**kwargs)
 
 
 @cache
 def load_letters(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Letter Recognition dataset from UCI machine learning repository
     http://archive.ics.uci.edu/ml/datasets/Letter+Recognition
@@ -289,14 +287,17 @@ def load_letters(
     data = download_and_read_csv(url, raw_data_cache, header=None, dtype=None)
     x, y = data.iloc[:, 1:], data.iloc[:, 0].astype("category").cat.codes.values
 
-    data_desc = {"n_classes": 26, "default_split": {"test_size": 0.2, "random_state": 0}}
+    data_desc = {
+        "n_classes": 26,
+        "default_split": {"test_size": 0.2, "random_state": 0},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_sklearn_digits(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     x, y = load_digits(return_X_y=True)
     data_desc = {
         "n_classes": 10,
@@ -307,8 +308,8 @@ def load_sklearn_digits(
 
 @cache
 def load_covtype(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Cover type dataset from UCI machine learning repository
     https://archive.ics.uci.edu/ml/datasets/covertype
@@ -331,8 +332,8 @@ def load_covtype(
 
 @cache
 def load_epsilon(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Epsilon dataset
     https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html
@@ -374,8 +375,8 @@ def load_epsilon(
 @preprocess
 @cache
 def load_gisette(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     GISETTE is a handwritten digit recognition problem.
     The problem is to separate the highly confusable digits '4' and '9'.
@@ -435,21 +436,24 @@ def load_gisette(
 
 @cache
 def load_a9a(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     def transform_x_y(x, y):
         y[y == -1] = 0
         return x, y
 
     x, y = load_openml(1430, raw_data_cache, transform_x_y)
-    data_desc = {"n_classes": 2, "default_split": {"test_size": 0.2, "random_state": 11}}
+    data_desc = {
+        "n_classes": 2,
+        "default_split": {"test_size": 0.2, "random_state": 11},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_codrnanorm(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     def transform_x_y(x, y):
         x = pd.DataFrame(x)
         y = y.astype("int")
@@ -457,32 +461,41 @@ def load_codrnanorm(
         return x, y
 
     x, y = load_openml(1241, raw_data_cache, transform_x_y_func=transform_x_y)
-    data_desc = {"n_classes": 2, "default_split": {"test_size": 0.2, "random_state": 42}}
+    data_desc = {
+        "n_classes": 2,
+        "default_split": {"test_size": 0.2, "random_state": 42},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_creditcard(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     x, y = load_openml(1597, raw_data_cache)
-    data_desc = {"n_classes": 2, "default_split": {"test_size": 0.1, "random_state": 777}}
+    data_desc = {
+        "n_classes": 2,
+        "default_split": {"test_size": 0.1, "random_state": 777},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_fraud(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     x, y = load_openml(42175, raw_data_cache)
-    data_desc = {"n_classes": 2, "default_split": {"test_size": 0.2, "random_state": 77}}
+    data_desc = {
+        "n_classes": 2,
+        "default_split": {"test_size": 0.2, "random_state": 77},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_ijcnn(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Author: Danil Prokhorov.
     libSVM,AAD group
@@ -498,14 +511,17 @@ def load_ijcnn(
         return x, y
 
     x, y = load_openml(1575, raw_data_cache, transform_x_y)
-    data_desc = {"n_classes": 2, "default_split": {"test_size": 0.2, "random_state": 42}}
+    data_desc = {
+        "n_classes": 2,
+        "default_split": {"test_size": 0.2, "random_state": 42},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_klaverjas(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Abstract:
     Klaverjas is an example of the Jack-Nine card games,
@@ -518,14 +534,17 @@ def load_klaverjas(
     Classification task. n_classes = 2.
     """
     x, y = load_openml(41228, raw_data_cache)
-    data_desc = {"n_classes": 2, "default_split": {"train_size": 0.2, "random_state": 42}}
+    data_desc = {
+        "n_classes": 2,
+        "default_split": {"train_size": 0.2, "random_state": 42},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_skin_segmentation(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Abstract:
     The Skin Segmentation dataset is constructed over B, G, R color space.
@@ -542,15 +561,18 @@ def load_skin_segmentation(
         return x, y
 
     x, y = load_openml(1502, raw_data_cache, transform_x_y)
-    data_desc = {"n_classes": 2, "default_split": {"test_size": 0.2, "random_state": 42}}
+    data_desc = {
+        "n_classes": 2,
+        "default_split": {"test_size": 0.2, "random_state": 42},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @preprocess
 @cache
 def load_cifar(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Source:
     University of Toronto
@@ -572,8 +594,8 @@ def load_cifar(
 
 @cache
 def load_connect(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Source:
     UC Irvine Machine Learning Repository
@@ -583,14 +605,17 @@ def load_connect(
     """
     x, y = load_openml(1591, raw_data_cache)
     y = (y + 1).astype("int")
-    data_desc = {"n_classes": 3, "default_split": {"test_size": 0.1, "random_state": 42}}
+    data_desc = {
+        "n_classes": 3,
+        "default_split": {"test_size": 0.1, "random_state": 42},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_covertype(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Abstract: This is the original version of the famous
     covertype dataset in ARFF format.
@@ -600,26 +625,32 @@ def load_covertype(
     Classification task. n_classes = 7.
     """
     x, y = load_openml(1596, raw_data_cache)
-    data_desc = {"n_classes": 7, "default_split": {"test_size": 0.4, "random_state": 42}}
+    data_desc = {
+        "n_classes": 7,
+        "default_split": {"test_size": 0.4, "random_state": 42},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 def load_mnist_template(
     openml_id: int,
     raw_data_cache: str,
-) -> Tuple[Dict, Dict]:
+) -> tuple[dict, dict]:
     def transform_x_y(x, y):
         return x.astype("uint8"), y.astype("uint8")
 
     x, y = load_openml(openml_id, raw_data_cache, transform_x_y)
-    data_desc = {"n_classes": 10, "default_split": {"test_size": 10000, "shuffle": False}}
+    data_desc = {
+        "n_classes": 10,
+        "default_split": {"test_size": 10000, "shuffle": False},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_mnist(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Abstract:
     The MNIST database of handwritten digits with 784 features.
@@ -636,22 +667,22 @@ def load_mnist(
 
 @cache
 def load_fashion_mnist(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     return load_mnist_template(40996, raw_data_cache)
 
 
 @cache
 def load_svhn(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     return load_mnist_template(41081, raw_data_cache)
 
 
 @cache
 def load_sensit(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     Abstract: Vehicle classification in distributed sensor networks.
     Author: M. Duarte, Y. H. Hu
@@ -660,14 +691,17 @@ def load_sensit(
     Classification task. n_classes = 3.
     """
     x, y = load_openml(1593, raw_data_cache)
-    data_desc = {"n_classes": 3, "default_split": {"test_size": 0.2, "random_state": 42}}
+    data_desc = {
+        "n_classes": 3,
+        "default_split": {"test_size": 0.2, "random_state": 42},
+    }
     return {"x": x, "y": y}, data_desc
 
 
 @cache
 def load_szilard_1m(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     https://github.com/szilard/GBM-perf
     """
@@ -698,8 +732,8 @@ def load_szilard_1m(
 
 @cache
 def load_szilard_10m(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     https://github.com/szilard/GBM-perf
     """
@@ -735,8 +769,8 @@ Regression datasets
 
 @cache
 def load_abalone(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     """
     https://archive.ics.uci.edu/ml/machine-learning-databases/abalone
 
@@ -752,8 +786,8 @@ def load_abalone(
 
 @cache
 def load_california_housing(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     x, y = fetch_california_housing(
         return_X_y=True, as_frame=False, data_home=raw_data_cache
     )
@@ -763,8 +797,8 @@ def load_california_housing(
 
 @cache
 def load_fried(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     x, y = load_openml(564, raw_data_cache)
     data_desc = {"default_split": {"test_size": 0.2, "random_state": 42}}
     return {"x": x, "y": y}, data_desc
@@ -772,8 +806,8 @@ def load_fried(
 
 @cache
 def load_medical_charges_nominal(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     x, y = load_openml(42559, raw_data_cache)
 
     data_desc = {"default_split": {"test_size": 0.2, "random_state": 42}}
@@ -782,8 +816,8 @@ def load_medical_charges_nominal(
 
 @cache
 def load_twodplanes(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     x, y = load_openml(1197, raw_data_cache)
     data_desc = {"default_split": {"test_size": 0.4, "random_state": 42}}
     return {"x": x, "y": y}, data_desc
@@ -791,8 +825,8 @@ def load_twodplanes(
 
 @cache
 def load_year_prediction_msd(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     url = (
         "https://archive.ics.uci.edu/ml/machine-learning-databases/00203/"
         "YearPredictionMSD.txt.zip"
@@ -805,8 +839,8 @@ def load_year_prediction_msd(
 
 @cache
 def load_yolanda(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     x, y = load_openml(42705, raw_data_cache)
     data_desc = {"default_split": {"test_size": 0.2, "random_state": 42}}
     return {"x": x, "y": y}, data_desc
@@ -814,8 +848,8 @@ def load_yolanda(
 
 @cache
 def load_road_network(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     url = "http://archive.ics.uci.edu/ml/machine-learning-databases/00246/3D_spatial_network.txt"
     n_samples, dtype = 20000, np.float32
     data = download_and_read_csv(url, raw_data_cache, dtype=dtype)
@@ -858,16 +892,16 @@ def load_ann_dataset_template(url, raw_data_cache):
 
 @cache
 def load_sift(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     url = "http://ann-benchmarks.com/sift-128-euclidean.hdf5"
     return load_ann_dataset_template(url, raw_data_cache)
 
 
 @cache
 def load_gist(
-    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: Dict
-) -> Tuple[Dict, Dict]:
+    data_name: str, data_cache: str, raw_data_cache: str, dataset_params: dict
+) -> tuple[dict, dict]:
     url = "http://ann-benchmarks.com/gist-960-euclidean.hdf5"
     return load_ann_dataset_template(url, raw_data_cache)
 

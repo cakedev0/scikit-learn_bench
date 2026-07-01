@@ -2,7 +2,6 @@ import json
 from datetime import datetime, timezone
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 from psutil import cpu_count
 from tqdm import tqdm
@@ -15,19 +14,19 @@ from .commands import run_runner_from_case
 from .env import get_environment_info
 
 
-def get_hardware_hash(hardware_info: Dict) -> str:
+def get_hardware_hash(hardware_info: dict) -> str:
     return hash_from_json_repr(hardware_info, hash_limit=6)
 
 
-def get_software_hash(software_info: Dict) -> str:
+def get_software_hash(software_info: dict) -> str:
     return hash_from_json_repr(software_info, hash_limit=6)
 
 
 def call_benchmarks(
-    bench_cases: List[BenchCase],
+    bench_cases: list[BenchCase],
     log_level: str = "WARNING",
     early_exit: bool = False,
-) -> Tuple[int, List[Dict], List[Dict]]:
+) -> tuple[int, list[dict], list[dict]]:
     results = []
     failed_cases = []
     return_code = 0
@@ -35,9 +34,7 @@ def call_benchmarks(
     bench_cases_with_pbar = tqdm(bench_cases)
     for bench_case in bench_cases_with_pbar:
         bench_cases_with_pbar.set_description(
-            custom_format(
-                bench_case.name(shortened=True), bcolor="HEADER"
-            )
+            custom_format(bench_case.name(shortened=True), bcolor="HEADER")
         )
         try:
             bench_return_code, rows, failed_case = run_runner_from_case(
@@ -70,11 +67,11 @@ def call_benchmarks(
 
 
 def save_results(
-    benchmark_results: List[Dict],
-    failed_cases: List[Dict],
+    benchmark_results: list[dict],
+    failed_cases: list[dict],
     hardware_hash: str,
     software_hash: str,
-    env_info: Dict,
+    env_info: dict,
     results_dir: str,
 ):
     results_root = Path(results_dir)
@@ -108,7 +105,7 @@ def save_results(
 
 
 def orchestrate_benchmarks(
-    bench_cases: List[BenchCase],
+    bench_cases: list[BenchCase],
     args,
 ) -> int:
     if args.log_level is not None:

@@ -4,7 +4,6 @@ from importlib import metadata
 import os
 from pathlib import Path
 import subprocess
-from typing import Dict
 
 import pandas as pd
 
@@ -123,7 +122,7 @@ def get_runtime_import_info(import_names: list[str] | None = None) -> dict:
     return result
 
 
-def get_software_info() -> Dict:
+def get_software_info() -> dict:
     result = {}
     result["threadpool_info"] = get_threadpool_info()
     result["runtime_imports"] = get_runtime_import_info()
@@ -208,9 +207,7 @@ def get_nvidia_devices() -> pd.DataFrame:
     driver_version = get_nvml_value(pynvml.nvmlSystemGetDriverVersion)
     cuda_driver_version = None
     if hasattr(pynvml, "nvmlSystemGetCudaDriverVersion_v2"):
-        cuda_driver_version = get_nvml_value(
-            pynvml.nvmlSystemGetCudaDriverVersion_v2
-        )
+        cuda_driver_version = get_nvml_value(pynvml.nvmlSystemGetCudaDriverVersion_v2)
     elif hasattr(pynvml, "nvmlSystemGetCudaDriverVersion"):
         cuda_driver_version = get_nvml_value(pynvml.nvmlSystemGetCudaDriverVersion)
     cuda_driver_version = format_cuda_driver_version(cuda_driver_version)
@@ -263,7 +260,7 @@ def get_higher_isa(cpu_flags: str) -> str:
     return "unknown"
 
 
-def get_hardware_info() -> Dict:
+def get_hardware_info() -> dict:
     result = {}
     oneapi_devices = get_oneapi_devices()
     if len(oneapi_devices) > 0:
@@ -290,10 +287,8 @@ def get_hardware_info() -> Dict:
         cpu_info["flags"] = " ".join(cpu_info["flags"])
         cpu_info["physical_cores"] = joblib.cpu_count(only_physical_cores=True)
         result["CPU"] = cpu_info
-        logger.info(f'CPU name: {cpu_info["name"]}')
-        logger.info(
-            "Highest supported ISA: " f'{get_higher_isa(cpu_info["flags"]).upper()}'
-        )
+        logger.info(f"CPU name: {cpu_info['name']}")
+        logger.info(f"Highest supported ISA: {get_higher_isa(cpu_info['flags']).upper()}")
     except (ImportError, ModuleNotFoundError):
         logger.warning('Unable to parse CPU info with "cpuinfo" module')
 
@@ -313,11 +308,11 @@ def get_hardware_info() -> Dict:
         import psutil
 
         result["RAM size[GB]"] = round(psutil.virtual_memory().total / 2**30)
-        logger.info(f'RAM size[GB]: {result["RAM size[GB]"]}')
+        logger.info(f"RAM size[GB]: {result['RAM size[GB]']}")
     except (ImportError, ModuleNotFoundError):
         logger.warning('Unable to parse memory info with "psutil" module')
     return result
 
 
-def get_environment_info() -> Dict:
+def get_environment_info() -> dict:
     return {"hardware": get_hardware_info(), "software": get_software_info()}

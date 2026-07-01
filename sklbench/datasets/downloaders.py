@@ -14,9 +14,9 @@
 # limitations under the License.
 # ===============================================================================
 
+from collections.abc import Callable
 import os
 import time
-from typing import Callable, List, Union
 
 import numpy as np
 import openml
@@ -130,7 +130,7 @@ def fetch_and_correct_openml(
 def load_openml(
     data_id: int,
     raw_data_cache_dir: str,
-    transform_x_y_func: Union[Callable, None] = None,
+    transform_x_y_func: Callable | None = None,
     as_frame: str = "auto",
 ):
     x, y = fetch_and_correct_openml(data_id, raw_data_cache_dir, as_frame)

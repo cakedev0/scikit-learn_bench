@@ -4,7 +4,6 @@ import sys
 import tempfile
 from pathlib import Path
 from time import time
-from typing import Dict, List, Optional, Tuple
 
 from ..config import BenchCase
 from ..utils.common import hash_from_json_repr
@@ -15,8 +14,8 @@ def generate_runner_command(
     case_file: Path,
     output_jsonl: Path,
     log_level: str,
-) -> List[str]:
-    command_prefix: List[str] = []
+) -> list[str]:
+    command_prefix: list[str] = []
     if bench_case.bench.taskset is not None:
         command_prefix.extend(["taskset", "-c", str(bench_case.bench.taskset)])
 
@@ -60,7 +59,7 @@ def generate_runner_command(
     ]
 
 
-def parse_runner_jsonl(output_jsonl: Path) -> List[Dict]:
+def parse_runner_jsonl(output_jsonl: Path) -> list[dict]:
     rows = []
     if not output_jsonl.exists():
         return rows
@@ -74,7 +73,7 @@ def parse_runner_jsonl(output_jsonl: Path) -> List[Dict]:
 
 def run_runner_from_case(
     bench_case: BenchCase, log_level: str
-) -> Tuple[int, List[Dict], Optional[Dict]]:
+) -> tuple[int, list[dict], dict | None]:
     bench_case_dict = bench_case.json_dict()
     bench_time_limit = bench_case.bench.time_limit
     command_timeout = bench_time_limit * 1.5 + 10
@@ -85,9 +84,7 @@ def run_runner_from_case(
         with case_file.open("w", encoding="utf-8") as fp:
             json.dump(bench_case_dict, fp)
 
-        command = generate_runner_command(
-            bench_case, case_file, output_jsonl, log_level
-        )
+        command = generate_runner_command(bench_case, case_file, output_jsonl, log_level)
         try:
             result = sp.run(
                 command,
