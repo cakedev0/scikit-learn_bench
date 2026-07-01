@@ -6,6 +6,7 @@ import timeit
 from math import ceil, sqrt
 from time import sleep
 from typing import Dict, List, Optional, Tuple
+import joblib
 
 import numpy as np
 import psutil
@@ -228,7 +229,10 @@ def measure_perf(
     if enable_garbage_collection:
         gc.collect()
 
-    perf_metrics = {}
+    perf_metrics = {
+        "n_detected_physical_cores": joblib.cpu_count(only_physical_cores=True),
+        "n_detected_logical_cpus": joblib.cpu_count(only_physical_cores=False),
+    }
     if enable_memory_profiling:
         perf_metrics["peak RAM usage[MB]"] = [
             memory_peak / 2**20 for memory_peak in memory_peaks["RAM"]
