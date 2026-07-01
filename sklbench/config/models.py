@@ -7,7 +7,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
 JsonDict = dict[str, Any]
@@ -20,7 +20,6 @@ class _Section(BaseModel):
 class Bench(_Section):
     n_runs: int = 10
     time_limit: float = 600
-    threadpool_limits: PositiveInt | None = None
     taskset: str | int | None = None
     distributor: str | None = None
     mpi_params: JsonDict = Field(default_factory=dict)

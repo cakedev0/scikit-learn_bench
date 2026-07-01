@@ -1,5 +1,4 @@
 import argparse
-from contextlib import nullcontext
 import inspect
 import json
 import math
@@ -207,15 +206,6 @@ def estimator_params_for_repeat(
     return params
 
 
-def _threadpool_context(limits: int | None):
-    if limits is None:
-        return nullcontext()
-
-    from threadpoolctl import threadpool_limits
-
-    return threadpool_limits(limits=limits)
-
-
 def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     library_name = bench_case.implementation.library
     estimator_name = bench_case.algorithm.estimator
@@ -230,10 +220,8 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
     n_runs = bench_case.bench.n_runs
     time_limit = bench_case.bench.time_limit
 
-    with (
-        output_jsonl.open("w", encoding="utf-8") as fp,
-        get_context(bench_case.implementation),
-        _threadpool_context(bench_case.bench.threadpool_limits),
+    with output_jsonl.open("w", encoding="utf-8") as fp, get_context(
+        bench_case.implementation
     ):
         t0 = timeit.default_timer()
         for repeat in range(n_runs):
