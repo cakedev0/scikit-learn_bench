@@ -144,6 +144,7 @@ def generate_cases():
         "configs/array_api_cpu.py",
         "configs/array_api_intel.py",
         "configs/array_api_nvidia.py",
+        "configs/hgb_scaling.py",
     ],
 )
 def test_active_configs_generate_valid_cases(path):
