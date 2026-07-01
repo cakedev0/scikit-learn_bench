@@ -91,7 +91,6 @@ def convert_data(data, dformat: str, order: str, dtype: str, device: str = None)
             os.environ["MODIN_ENGINE"] = "dask"
         elif dformat.endswith("unidist"):
             os.environ["MODIN_ENGINE"] = "unidist"
-            os.environ["UNIDIST_BACKEND"] = "mpi"
         else:
             logger.info(
                 "Modin engine is unknown or not specified. Default engine will be used."

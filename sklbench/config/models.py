@@ -21,8 +21,6 @@ class Bench(_Section):
     n_runs: int = 10
     time_limit: float = 600
     taskset: str | int | None = None
-    distributor: str | None = None
-    mpi_params: JsonDict = Field(default_factory=dict)
     vtune_profiling: str | None = None
     vtune_results_directory: str = "_vtune_results"
     flush_cache: bool = False

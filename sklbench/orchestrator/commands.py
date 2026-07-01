@@ -19,12 +19,6 @@ def generate_runner_command(
     if bench_case.bench.taskset is not None:
         command_prefix.extend(["taskset", "-c", str(bench_case.bench.taskset)])
 
-    if bench_case.bench.distributor == "mpi":
-        mpi_prefix = ["mpirun"]
-        for mpi_param_name, mpi_param_value in bench_case.bench.mpi_params.items():
-            mpi_prefix.extend([f"-{mpi_param_name}", str(mpi_param_value)])
-        command_prefix = mpi_prefix + command_prefix
-
     if bench_case.bench.vtune_profiling is not None and sys.platform == "linux":
         vtune_result_dir = Path(bench_case.bench.vtune_results_directory)
         vtune_result_dir.mkdir(parents=True, exist_ok=True)

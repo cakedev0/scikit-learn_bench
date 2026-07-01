@@ -77,6 +77,15 @@ def test_validate_case_rejects_invalid_nested_section_keys():
         validate_case(case)
 
 
+@pytest.mark.parametrize("bench_key", ["distributor", "mpi_params"])
+def test_validate_case_rejects_mpi_bench_keys(bench_key):
+    case = minimal_case()
+    case["bench"][bench_key] = "mpi" if bench_key == "distributor" else {"np": 2}
+
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        validate_case(case)
+
+
 def test_validate_case_rejects_non_json_values():
     case = minimal_case()
     case["algorithm"]["estimator_params"]["callback"] = lambda value: value
