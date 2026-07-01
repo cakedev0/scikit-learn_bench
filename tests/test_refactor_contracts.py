@@ -273,9 +273,13 @@ def make_run(
 def test_read_benchmark_records_reads_raw_results(tmp_path):
     records_dir = tmp_path / "records"
     records_dir.mkdir()
+    profiles_dir = tmp_path / "profiles"
+    profiles_dir.mkdir()
     result_path = (
         records_dir / "sklearn_Ridge_make_regr_abcde_20260101T010203000004Z.json"
     )
+    profile_path = profiles_dir / f"{result_path.stem}.svg"
+    profile_path.write_text("<svg></svg>", encoding="utf-8")
     case = validate_case(minimal_case()).json_dict()
     result_path.write_text(
         json.dumps(
@@ -297,6 +301,33 @@ def test_read_benchmark_records_reads_raw_results(tmp_path):
     assert len(records) == 1
     assert records[0].case == expected_case
     assert records[0].runs == [make_run()]
+    assert records[0].profile_path == profile_path
+
+
+def test_read_benchmark_records_sets_missing_profile_to_none(tmp_path):
+    records_dir = tmp_path / "records"
+    records_dir.mkdir()
+    result_path = (
+        records_dir / "sklearn_Ridge_make_regr_abcde_20260101T010203000004Z.json"
+    )
+    case = validate_case(minimal_case()).json_dict()
+    result_path.write_text(
+        json.dumps(
+            {
+                "hardware_hash": "hardware",
+                "software_hash": "software",
+                "case": case,
+                "results": [make_run()],
+                "failed_case": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    records = read_benchmark_records(tmp_path)
+
+    assert len(records) == 1
+    assert records[0].profile_path is None
 
 
 def test_reporting_reads_raw_runner_results():
