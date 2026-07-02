@@ -82,7 +82,7 @@ class Implementation(_Section):
     sklearnex_context: JsonDict | None = None
 
 
-class BenchCase(BaseModel):
+class EstimatorCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     metadata: dict[str, Any]
@@ -112,12 +112,12 @@ def _json_normalize(value: Any, context: str) -> Any:
         raise ValueError(f"{context} must be JSON serializable: {exc}") from exc
 
 
-def validate_case(case: dict) -> BenchCase:
+def validate_case(case: dict) -> EstimatorCase:
     if not isinstance(case, dict):
         raise TypeError(f"case must be a dict, got {type(case).__name__}")
     normalized_input = _json_normalize(case, "case")
     try:
-        validated = BenchCase.model_validate(normalized_input)
+        validated = EstimatorCase.model_validate(normalized_input)
     except ValidationError as exc:
         raise ValueError(str(exc)) from exc
 
@@ -144,7 +144,7 @@ def _load_module_from_path(path: Path) -> ModuleType:
     return module
 
 
-def load_cases_from_script(path: str | Path) -> list[BenchCase]:
+def load_cases_from_script(path: str | Path) -> list[EstimatorCase]:
     config_path = Path(path)
     if not config_path.is_file():
         raise FileNotFoundError(f"Config script not found: {config_path}")

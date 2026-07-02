@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from ..config import BenchCase
+from ..config import EstimatorCase
 from ..datasets import load_data
 from ..datasets.transformer import split_and_transform_data
 from ..utils.logger import logger
@@ -138,7 +138,7 @@ def _collect_model_attributes(estimator) -> dict[str, Any]:
 
 
 def run_case_once(
-    bench_case: BenchCase,
+    bench_case: EstimatorCase,
     estimator,
     data,
     data_description: dict,
@@ -204,7 +204,7 @@ def estimator_params_for_repeat(
     return params
 
 
-def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
+def run_case_to_jsonl(bench_case: EstimatorCase, output_jsonl: Path):
     library_name = bench_case.implementation.library
     estimator_name = bench_case.algorithm.estimator
     estimator_class = get_estimator(library_name, estimator_name)
@@ -240,25 +240,15 @@ def run_case_to_jsonl(bench_case: BenchCase, output_jsonl: Path):
                 break
 
 
-def parse_args() -> argparse.Namespace:
+def main() -> int:
     parser = argparse.ArgumentParser(prog="python -m sklbench.runner")
     parser.add_argument("--case-file", required=True, type=Path)
+    parser.add_argument("--n-runs", required=True, type=int)
     parser.add_argument("--output-jsonl", required=True, type=Path)
-    parser.add_argument(
-        "--log-level",
-        default="WARNING",
-        type=str,
-        choices=("ERROR", "WARNING", "INFO", "DEBUG"),
-        help="Logging level for benchmark runner",
-    )
-    return parser.parse_args()
-
-
-def main() -> int:
-    args = parse_args()
+    args = parser.parse_args()
     logger.setLevel(args.log_level)
     with args.case_file.open("r", encoding="utf-8") as fp:
-        bench_case = BenchCase.model_validate(json.load(fp))
+        bench_case = EstimatorCase.model_validate(json.load(fp))
     run_case_to_jsonl(bench_case, args.output_jsonl)
     return 0
 

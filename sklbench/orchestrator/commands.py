@@ -4,11 +4,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-from ..config import BenchCase
+from ..config import EstimatorCase
 
 
 def generate_runner_command(
-    bench_case: BenchCase,
+    bench_case: EstimatorCase,
     case_file: Path,
     output_jsonl: Path,
     log_level: str,
@@ -55,7 +55,7 @@ def parse_runner_jsonl(output_jsonl: Path) -> list[dict]:
 
 
 def run_runner_from_case(
-    bench_case: BenchCase,
+    bench_case: EstimatorCase,
     log_level: str,
     py_spy_output: Path | None = None,
     n_runs_override: int | None = None,

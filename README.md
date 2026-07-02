@@ -62,7 +62,7 @@ For a description of all benchmarks runner arguments, refer to [documentation](s
 
 Benchmark configs are trusted Python scripts. The orchestrator imports the
 script passed to `--config`, calls `generate_cases()`, validates each returned
-case with `sklbench.config.validate_case`, and passes `BenchCase` Pydantic
+case with `sklbench.config.validate_case`, and passes `EstimatorCase` Pydantic
 models through orchestration.
 
 `generate_cases()` must return a `list[dict]`:
@@ -111,7 +111,7 @@ Config loading steps:
 1. Import the script passed to `--config`.
 2. Call `generate_cases()`.
 3. Validate every returned dict with `sklbench.config.validate_case`.
-4. Pass `BenchCase` Pydantic models through orchestration and serialize them
+4. Pass `EstimatorCase` Pydantic models through orchestration and serialize them
    only at JSON boundaries.
 
 ### Scikit-learn_bench High-Level Workflow

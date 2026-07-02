@@ -3,7 +3,7 @@
 from .models import (
     Algorithm,
     Bench,
-    BenchCase,
+    EstimatorCase,
     Data,
     Implementation,
     load_cases_from_script,
@@ -13,7 +13,7 @@ from .models import (
 __all__ = [
     "Algorithm",
     "Bench",
-    "BenchCase",
+    "EstimatorCase",
     "Data",
     "Implementation",
     "load_cases_from_script",

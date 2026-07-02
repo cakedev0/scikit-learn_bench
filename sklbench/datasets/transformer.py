@@ -22,7 +22,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from sklearn.model_selection import train_test_split
 
-from ..config import BenchCase
+from ..config import EstimatorCase
 from ..utils.logger import logger
 
 
@@ -127,7 +127,7 @@ def train_test_split_wrapper(*args, **kwargs):
         return train_test_split(*args, **kwargs)
 
 
-def split_and_transform_data(bench_case: BenchCase, data, data_description):
+def split_and_transform_data(bench_case: EstimatorCase, data, data_description):
     data_params = bench_case.data
     if "default_split" in data_description:
         split_kwargs = data_description["default_split"].copy()

@@ -7,7 +7,7 @@ from pathlib import Path
 from psutil import cpu_count
 from tqdm import tqdm
 
-from ..config import BenchCase
+from ..config import EstimatorCase
 from ..datasets import load_data_with_cleanup
 from ..utils.common import custom_format, hash_from_json_repr
 from ..utils.logger import logger
@@ -30,7 +30,7 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
 
 
-def _case_basename(bench_case: BenchCase) -> str:
+def _case_basename(bench_case: EstimatorCase) -> str:
     case_slug = bench_case.name(shortened=True, separator="_")
     case_slug = _UNSAFE_FILENAME_CHARS.sub("_", case_slug).strip("_")
     case_hash = hash_from_json_repr(bench_case.json_dict())
@@ -63,7 +63,7 @@ def save_environment_sidecars(
 
 def save_benchmark_record(
     record_path: Path,
-    bench_case: BenchCase,
+    bench_case: EstimatorCase,
     rows: list[dict],
     failed_case: dict | None,
     hardware_hash: str,
@@ -83,7 +83,7 @@ def save_benchmark_record(
 
 
 def call_benchmarks(
-    bench_cases: list[BenchCase],
+    bench_cases: list[EstimatorCase],
     hardware_hash: str,
     software_hash: str,
     results_dir: str,
@@ -193,7 +193,7 @@ def call_benchmarks(
 
 
 def orchestrate_benchmarks(
-    bench_cases: list[BenchCase],
+    bench_cases: list[EstimatorCase],
     args,
 ) -> int:
     if args.log_level is not None:

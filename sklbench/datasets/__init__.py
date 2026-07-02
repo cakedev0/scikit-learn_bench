@@ -17,7 +17,7 @@
 import gc
 import os
 
-from ..config import BenchCase
+from ..config import EstimatorCase
 from ..utils.common import custom_format
 from .loaders import (
     dataset_loading_functions,
@@ -27,7 +27,7 @@ from .loaders import (
 )
 
 
-def load_data(bench_case: BenchCase) -> tuple[dict, dict]:
+def load_data(bench_case: EstimatorCase) -> tuple[dict, dict]:
     data_params = bench_case.data
     data_name = data_params.name(shortened=False)
     data_cache = data_params.cache_directory or os.environ.get(
@@ -73,7 +73,7 @@ def load_data(bench_case: BenchCase) -> tuple[dict, dict]:
     )
 
 
-def load_data_with_cleanup(bench_case: BenchCase):
+def load_data_with_cleanup(bench_case: EstimatorCase):
     result = load_data(bench_case)
     del result
     gc.collect()
