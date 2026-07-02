@@ -85,6 +85,7 @@ class Implementation(_Section):
 class BenchCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    metadata: dict[str, Any]
     bench: Bench = Field(default_factory=Bench)
     algorithm: Algorithm
     data: Data
