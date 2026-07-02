@@ -35,29 +35,6 @@ def add_orchestrator_arguments(
     parser: argparse.ArgumentParser,
 ) -> argparse.ArgumentParser:
     parser.add_argument(
-        "--runner-log-level",
-        default="WARNING",
-        type=str,
-        choices=("ERROR", "WARNING", "INFO", "DEBUG"),
-        help="Logging level for benchmarks orchestrator.",
-    )
-    parser.add_argument(
-        "--bench-log-level",
-        default="WARNING",
-        type=str,
-        choices=("ERROR", "WARNING", "INFO", "DEBUG"),
-        help="Logging level for each benchmark runner process.",
-    )
-    parser.add_argument(
-        "--log-level",
-        "-l",
-        default=None,
-        type=str,
-        choices=("ERROR", "WARNING", "INFO", "DEBUG"),
-        help="Global logging level for benchmarks: "
-        "overwrites runner and benchmarks logging levels.",
-    )
-    parser.add_argument(
         "--config",
         "-c",
         type=str,

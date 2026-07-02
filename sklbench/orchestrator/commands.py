@@ -10,8 +10,8 @@ from ..config import EstimatorCase
 def generate_runner_command(
     bench_case: EstimatorCase,
     case_file: Path,
+    n_runs: int,
     output_jsonl: Path,
-    log_level: str,
     py_spy_output: Path | None = None,
 ) -> list[str]:
     command_prefix: list[str] = []
@@ -24,10 +24,10 @@ def generate_runner_command(
         "sklbench.runner",
         "--case-file",
         str(case_file),
+        "--n-runs",
+        str(n_runs),
         "--output-jsonl",
         str(output_jsonl),
-        "--log-level",
-        log_level,
     ]
 
     if py_spy_output is not None:
@@ -56,15 +56,12 @@ def parse_runner_jsonl(output_jsonl: Path) -> list[dict]:
 
 def run_runner_from_case(
     bench_case: EstimatorCase,
-    log_level: str,
     py_spy_output: Path | None = None,
     n_runs_override: int | None = None,
 ) -> tuple[int, list[dict], dict | None]:
     bench_case_dict = bench_case.json_dict()
-    if n_runs_override is not None:
-        bench_case_dict.setdefault("bench", {})["n_runs"] = n_runs_override
+    n_runs = n_runs_override if n_runs_override is not None else bench_case.bench.n_runs
     bench_time_limit = bench_case.bench.time_limit
-    command_timeout = bench_time_limit * 1.5 + 10
     with tempfile.TemporaryDirectory(prefix="sklbench-run-") as tmp_dir:
         tmp_path = Path(tmp_dir)
         case_file = tmp_path / "case.json"
@@ -73,7 +70,7 @@ def run_runner_from_case(
             json.dump(bench_case_dict, fp)
 
         command = generate_runner_command(
-            bench_case, case_file, output_jsonl, log_level, py_spy_output
+            bench_case, case_file, n_runs, output_jsonl, py_spy_output
         )
         try:
             result = sp.run(
@@ -81,7 +78,7 @@ def run_runner_from_case(
                 stdout=sp.PIPE,
                 stderr=sp.PIPE,
                 encoding="utf-8",
-                timeout=command_timeout,
+                timeout=bench_time_limit,
             )
             return_code = result.returncode
             stdout = result.stdout.strip()
@@ -90,7 +87,7 @@ def run_runner_from_case(
             return_code = -9
             stdout = (exc.stdout or "").strip()
             stderr = (exc.stderr or "").strip()
-            timeout_message = f"Command timed out after {command_timeout} seconds."
+            timeout_message = f"Runner exceeded time limit ({bench_time_limit} seconds)."
             stderr = f"{stderr}\n{timeout_message}".strip()
 
         rows = parse_runner_jsonl(output_jsonl)

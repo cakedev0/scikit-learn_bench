@@ -87,7 +87,6 @@ def call_benchmarks(
     hardware_hash: str,
     software_hash: str,
     results_dir: str,
-    log_level: str = "WARNING",
     early_exit: bool = False,
 ) -> tuple[int, list[dict], list[dict]]:
     results = []
@@ -107,9 +106,7 @@ def call_benchmarks(
             custom_format(bench_case.name(shortened=True), bcolor="HEADER")
         )
         try:
-            bench_return_code, rows, failed_case = run_runner_from_case(
-                bench_case, log_level
-            )
+            bench_return_code, rows, failed_case = run_runner_from_case(bench_case)
             save_benchmark_record(
                 record_path,
                 bench_case,
@@ -139,7 +136,6 @@ def call_benchmarks(
                 profile_n_runs = max(1, bench_case.bench.n_runs // 3)
                 profile_return_code, _, profile_failed_case = run_runner_from_case(
                     bench_case,
-                    log_level,
                     py_spy_output=profile_path,
                     n_runs_override=profile_n_runs,
                 )
@@ -196,10 +192,7 @@ def orchestrate_benchmarks(
     bench_cases: list[EstimatorCase],
     args,
 ) -> int:
-    if args.log_level is not None:
-        for log_type in ["runner", "bench"]:
-            setattr(args, f"{log_type}_log_level", args.log_level)
-    logger.setLevel(args.runner_log_level)
+    logger.setLevel("WARNING")
 
     env_info = get_environment_info()
     hardware_hash = get_hardware_hash(env_info["hardware"])
@@ -225,7 +218,6 @@ def orchestrate_benchmarks(
         hardware_hash,
         software_hash,
         args.results_dir,
-        args.bench_log_level,
         args.exit_on_error,
     )
     logger.debug(custom_format(result))

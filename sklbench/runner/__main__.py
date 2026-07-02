@@ -204,7 +204,7 @@ def estimator_params_for_repeat(
     return params
 
 
-def run_case_to_jsonl(bench_case: EstimatorCase, output_jsonl: Path):
+def run_case_to_jsonl(bench_case: EstimatorCase, n_runs: int, output_jsonl: Path):
     library_name = bench_case.implementation.library
     estimator_name = bench_case.algorithm.estimator
     estimator_class = get_estimator(library_name, estimator_name)
@@ -215,14 +215,11 @@ def run_case_to_jsonl(bench_case: EstimatorCase, output_jsonl: Path):
     )
     data = tuple(data)
     estimator_params = dict(bench_case.algorithm.estimator_params)
-    n_runs = bench_case.bench.n_runs
-    time_limit = bench_case.bench.time_limit
 
     with (
         output_jsonl.open("w", encoding="utf-8") as fp,
         get_context(bench_case.implementation),
     ):
-        t0 = timeit.default_timer()
         for repeat in range(n_runs):
             repeat_estimator_params = estimator_params_for_repeat(
                 estimator_class, estimator_params, repeat
@@ -235,9 +232,6 @@ def run_case_to_jsonl(bench_case: EstimatorCase, output_jsonl: Path):
             )
             fp.write(json.dumps(row, default=_as_jsonable) + "\n")
             fp.flush()
-            if timeit.default_timer() - t0 > time_limit:
-                logger.warning(f"runner exceeded time limit ({time_limit} seconds)")
-                break
 
 
 def main() -> int:
@@ -246,10 +240,10 @@ def main() -> int:
     parser.add_argument("--n-runs", required=True, type=int)
     parser.add_argument("--output-jsonl", required=True, type=Path)
     args = parser.parse_args()
-    logger.setLevel(args.log_level)
+    logger.setLevel("WARNING")
     with args.case_file.open("r", encoding="utf-8") as fp:
         bench_case = EstimatorCase.model_validate(json.load(fp))
-    run_case_to_jsonl(bench_case, args.output_jsonl)
+    run_case_to_jsonl(bench_case, args.n_runs, args.output_jsonl)
     return 0
 
 
