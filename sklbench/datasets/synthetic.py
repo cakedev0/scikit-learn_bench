@@ -16,6 +16,7 @@
 from collections.abc import Sequence
 
 import numpy as np
+import pandas as pd
 from sklearn.datasets import make_classification, make_regression
 from sklearn.utils import check_random_state
 
@@ -24,23 +25,25 @@ ColumnSpec = str | Sequence[str]
 
 
 def transform_columns(
-    x: np.ndarray, columns: ColumnSpec, rng: np.random.RandomState
+    X: np.ndarray, columns: str, rng: np.random.RandomState,
+    as_frame=False,
 ) -> None:
-    n_features = x.shape[1]
+    n_features = X.shape[1]
     if columns == "mix":
         columns = ["continuous", "binary", "long-tail"] * n_features
         columns = columns[:n_features]
     elif isinstance(columns, str):
         columns = [columns] * n_features
 
-    for col_idx in rng.permutation(n_features):
-        col_type = columns[col_idx]
-        values = x[:, col_idx]
+    for i, col_idx in enumerate(rng.permutation(n_features)):
+        col_type = columns[i]
+        values = X[:, col_idx]
+
         if col_type == "continuous":
             continue
         if col_type == "binary":
             thresholds = np.quantile(values, np.sort(rng.uniform(size=2)))
-            x[:, col_idx] = np.searchsorted(thresholds, values) == 1
+            X[:, col_idx] = np.searchsorted(thresholds, values) == 1
         elif col_type == "long-tail":
             noise_ratio = rng.uniform(0.05, 0.5)
             n_bins = max(1, min(3, rng.poisson(10)))
@@ -51,20 +54,31 @@ def transform_columns(
             mask = rng.rand(binned.size) < noise_ratio
             if mask.any():
                 binned[mask] = rng.geometric(min(1, 20 / mask.sum()), size=mask.sum())
-            x[:, col_idx] = binned
+            X[:, col_idx] = binned
         else:
             raise ValueError(col_type)
 
+    if not as_frame:
+        return X
 
-def make_trees_regression_data(*, columns: ColumnSpec, random_state=None, **kwargs):
+    X = pd.DataFrame(X)
+    for i in range(n_features):
+        n_uniques = len(X[i].value_counts())
+        if 2 < n_uniques < 255:
+            X[i] = X[i].astype("category")
+
+    return X
+
+
+def make_trees_regression_data(*, columns: ColumnSpec, random_state=None, as_frame=False, **kwargs):
     rng = check_random_state(random_state)
-    x, y = make_regression(**kwargs, random_state=rng)
-    transform_columns(x, columns, rng)
-    return x, y
+    X, y = make_regression(**kwargs, random_state=rng)
+    X = transform_columns(X, columns, rng, as_frame=as_frame)
+    return X, y
 
 
-def make_trees_classification_data(*, columns: ColumnSpec, random_state=None, **kwargs):
+def make_trees_classification_data(*, columns: ColumnSpec, random_state=None, as_frame=False, **kwargs):
     rng = check_random_state(random_state)
-    x, y = make_classification(**kwargs, random_state=rng)
-    transform_columns(x, columns, rng)
-    return x, y
+    X, y = make_classification(**kwargs, random_state=rng)
+    X = transform_columns(X, columns, rng, as_frame=as_frame)
+    return X, y
