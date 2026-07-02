@@ -15,6 +15,7 @@
 # ===============================================================================
 
 import json
+import logging
 import os
 import re
 
@@ -24,13 +25,13 @@ from scipy.sparse import csr_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import (
     MinMaxScaler,
-    OneHotEncoder,
     OrdinalEncoder,
     StandardScaler,
 )
 
 from ..utils.custom_types import Array
-from ..utils.logger import logger
+
+logger = logging.getLogger(__name__)
 
 # NB: non-registered data components and extensions will not be found by loader
 KNOWN_DATA_COMPONENTS = ["x", "y"]

@@ -1,18 +1,20 @@
 import gc
+import logging
 import subprocess
 import sys
 import threading
 import timeit
 from math import ceil, sqrt
 from time import sleep
-import joblib
 
+import joblib
 import numpy as np
 import psutil
 from cpuinfo import get_cpu_info
 
 from ..config import Bench
-from ..utils.logger import logger
+
+logger = logging.getLogger(__name__)
 
 try:
     import pynvml

@@ -1,10 +1,12 @@
 import importlib
+import logging
 
 from sklearn.base import BaseEstimator
 
 from ..config.models import Implementation
 from ..utils.common import get_module_members
-from ..utils.logger import logger
+
+logger = logging.getLogger(__name__)
 
 
 TASK_TO_ESTIMATOR_SUFFIXES = {

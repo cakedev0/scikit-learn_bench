@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from multiprocessing import Pool
@@ -10,11 +11,10 @@ from tqdm import tqdm
 from ..config import EstimatorCase
 from ..datasets import load_data_with_cleanup
 from ..utils.common import custom_format, hash_from_json_repr
-from ..utils.logger import logger
 from .commands import run_runner_from_case
 from .env import get_environment_info
 
-
+logger = logging.getLogger(__name__)
 _UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
@@ -192,7 +192,10 @@ def orchestrate_benchmarks(
     bench_cases: list[EstimatorCase],
     args,
 ) -> int:
-    logger.setLevel("WARNING")
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(levelname)s - %(name)s - %(message)s",
+    )
 
     env_info = get_environment_info()
     hardware_hash = get_hardware_hash(env_info["hardware"])

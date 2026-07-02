@@ -14,6 +14,7 @@
 # limitations under the License.
 # ===============================================================================
 
+import logging
 import os
 import warnings
 
@@ -23,7 +24,8 @@ from scipy.sparse import csr_matrix
 from sklearn.model_selection import train_test_split
 
 from ..config import EstimatorCase
-from ..utils.logger import logger
+
+logger = logging.getLogger(__name__)
 
 
 def _torch_dtype(dtype: str | None):

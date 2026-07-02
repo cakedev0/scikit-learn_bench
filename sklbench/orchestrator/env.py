@@ -1,13 +1,14 @@
-import json
 import importlib
-from importlib import metadata
+import json
+import logging
 import os
-from pathlib import Path
 import subprocess
+from importlib import metadata
+from pathlib import Path
 
 import pandas as pd
 
-from ..utils.logger import logger
+logger = logging.getLogger(__name__)
 
 
 def get_threadpool_info():
@@ -270,8 +271,8 @@ def get_hardware_info() -> dict:
         logger.info(f"NVML listed NVIDIA devices:\n{nvidia_devices}\n")
 
     try:
-        from cpuinfo import get_cpu_info
         import joblib
+        from cpuinfo import get_cpu_info
 
         cpu_info = get_cpu_info()
         fields_map = {

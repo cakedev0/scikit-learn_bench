@@ -1,10 +1,10 @@
 import argparse
 import inspect
 import json
+import logging
 import math
 import statistics
 import sys
-import timeit
 from pathlib import Path
 from typing import Any
 
@@ -13,10 +13,11 @@ import numpy as np
 from ..config import EstimatorCase
 from ..datasets import load_data
 from ..datasets.transformer import split_and_transform_data
-from ..utils.logger import logger
 from .estimator import estimator_to_task, get_context, get_estimator
 from .measurement import measure_perf
 from .metrics import get_subset_metrics_of_estimator
+
+logger = logging.getLogger(__name__)
 
 
 def _array_like_size(value: Any) -> int | None:
@@ -240,7 +241,10 @@ def main() -> int:
     parser.add_argument("--n-runs", required=True, type=int)
     parser.add_argument("--output-jsonl", required=True, type=Path)
     args = parser.parse_args()
-    logger.setLevel("WARNING")
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(levelname)s - %(name)s - %(message)s",
+    )
     with args.case_file.open("r", encoding="utf-8") as fp:
         bench_case = EstimatorCase.model_validate(json.load(fp))
     run_case_to_jsonl(bench_case, args.n_runs, args.output_jsonl)
